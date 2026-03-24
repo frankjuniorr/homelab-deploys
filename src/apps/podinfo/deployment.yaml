@@ -1,0 +1,23 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: podinfo
+  namespace: default
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: podinfo
+  template:
+    metadata:
+      labels:
+        app: podinfo
+    spec:
+      containers:
+      - name: podinfo
+        image: stefanprodan/podinfo:6.3.5
+        ports:
+        - containerPort: 9898
+        env:
+        - name: PODINFO_UI_MESSAGE
+          value: "Bem-vindo ao meu Homelab no Proxmox!"

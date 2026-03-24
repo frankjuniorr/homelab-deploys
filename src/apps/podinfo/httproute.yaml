@@ -1,0 +1,17 @@
+apiVersion: gateway.networking.k8s.io/v1
+kind: HTTPRoute
+metadata:
+  name: podinfo-route
+  namespace: default
+spec:
+  parentRefs:
+  - name: my-gateway
+    namespace: default
+  hostnames:
+  - "hello.frank.lab.io"
+  rules:
+  - matches:
+    - path: { type: PathPrefix, value: / }
+    backendRefs:
+    - name: podinfo-svc
+      port: 80

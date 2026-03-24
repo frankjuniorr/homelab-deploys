@@ -1,0 +1,35 @@
+# 1. Issuer temporário para criar a própria CA
+apiVersion: cert-manager.io/v1
+kind: Issuer
+metadata:
+  name: selfsigned-issuer
+  namespace: cert-manager
+spec:
+  selfSigned: {}
+---
+# 2. O Certificado "Pai" (Root CA)
+apiVersion: cert-manager.io/v1
+kind: Certificate
+metadata:
+  name: homelab-ca
+  namespace: cert-manager
+spec:
+  isCA: true
+  commonName: "Homelab Internal Root CA"
+  secretName: homelab-ca-tls
+  privateKey:
+    algorithm: ECDSA
+    size: 256
+  issuerRef:
+    name: selfsigned-issuer
+    kind: Issuer
+    group: cert-manager.io
+---
+# 3. O ClusterIssuer Real (que assina seus sites usando a CA acima)
+apiVersion: cert-manager.io/v1
+kind: ClusterIssuer
+metadata:
+  name: local-issuer
+spec:
+  ca:
+    secretName: homelab-ca-tls

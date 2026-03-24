@@ -1,0 +1,22 @@
+apiVersion: kustomize.config.k8s.io/v1beta1
+kind: Kustomization
+
+helmCharts:
+  - name: metallb
+    repo: https://metallb.github.io/metallb
+    releaseName: metallb
+    namespace: metallb-system
+  
+  - name: gateway-helm
+    repo: oci://docker.io/envoyproxy
+    version: v1.1.0
+    releaseName: eg
+    namespace: envoy-gateway-system
+    includeCRDs: true
+
+  - name: cert-manager
+    repo: https://charts.jetstack.io
+    releaseName: cert-manager
+    namespace: cert-manager
+    valuesInline:
+      installCRDs: true
