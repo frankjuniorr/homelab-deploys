@@ -1,20 +1,20 @@
 apiVersion: apps/v1
 kind: Deployment
 metadata:
-  name: podinfo
-  namespace: default
+  name: {{ app.name }}
+  namespace: {{ app.namespace }}
 spec:
   replicas: 1
   selector:
     matchLabels:
-      app: podinfo
+      app: {{ app.name }}
   template:
     metadata:
       labels:
-        app: podinfo
+        app: {{ app.name }}
     spec:
       containers:
-      - name: podinfo
+      - name: {{ app.name }}
         image: stefanprodan/podinfo:6.3.5
         ports:
         - containerPort: 9898

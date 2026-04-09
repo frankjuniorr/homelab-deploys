@@ -1,6 +1,0 @@
-resources:
-  - metallb-config.yaml
-  - gatewayclass.yaml
-  - gateway-api-instance.yaml
-  - cert-manager-issuer.yaml
-  - certificate.yaml

@@ -1,0 +1,34 @@
+---
+##############################################
+# WAIT FOR CRDs TO BE ESTABLISHED
+# Helm returns as soon as resources are applied, but the API server needs a
+# moment to process and register new CRDs. Attempting to create custom resources
+# (IPAddressPool, Gateway, Certificate) before their CRDs are Established fails
+# with "no matches for kind". We poll each critical CRD until its Established
+# condition is True before proceeding to base-configs.
+#
+# The `until` clause re-evaluates per loop item, so each CRD is polled
+# independently (up to retries × delay = 90 seconds each).
+##############################################
+- name: "Wait for infrastructure CRDs to be established"
+  kubernetes.core.k8s_info:
+    api_version: apiextensions.k8s.io/v1
+    kind: CustomResourceDefinition
+    name: "{{ item.crd }}"
+  register: crd_check
+  until: >
+    crd_check.resources | length > 0 and
+    (crd_check.resources[0].status.conditions |
+      selectattr('type', 'eq', 'Established') |
+      selectattr('status', 'eq', 'True') | list | length > 0)
+  retries: 18
+  delay: 5
+  loop:
+    # IPAddressPool: MetalLB CRD — required before metallb-config.yaml creates the IP pool
+    - crd: ipaddresspools.metallb.io
+    # gateways: Gateway API CRD — required before the Gateway object is created
+    - crd: gateways.gateway.networking.k8s.io
+    # certificates: cert-manager CRD — required before Certificate resources are created
+    - crd: certificates.cert-manager.io
+  loop_control:
+    label: "{{ item.crd }}"

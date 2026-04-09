@@ -3,7 +3,7 @@ apiVersion: cert-manager.io/v1
 kind: Issuer
 metadata:
   name: selfsigned-issuer
-  namespace: cert-manager
+  namespace: {{ namespace_cert_manager }}
 spec:
   selfSigned: {}
 ---
@@ -12,11 +12,11 @@ apiVersion: cert-manager.io/v1
 kind: Certificate
 metadata:
   name: homelab-ca
-  namespace: cert-manager
+  namespace: {{ namespace_cert_manager }}
 spec:
   isCA: true
-  commonName: "Homelab Internal Root CA"
-  secretName: homelab-ca-tls
+  commonName: "{{ homelab_ca_cn }}"
+  secretName: {{ ca_secret_name }}
   privateKey:
     algorithm: ECDSA
     size: 256
@@ -32,4 +32,4 @@ metadata:
   name: local-issuer
 spec:
   ca:
-    secretName: homelab-ca-tls
+    secretName: {{ ca_secret_name }}

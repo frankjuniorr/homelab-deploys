@@ -1,0 +1,14 @@
+apiVersion: cert-manager.io/v1
+kind: Certificate
+metadata:
+  name: homelab-wildcard
+  namespace: {{ namespace_gateway }}
+spec:
+  secretName: {{ wildcard_tls_secret_name }}
+  issuerRef:
+    name: local-issuer
+    kind: ClusterIssuer
+  commonName: "*.{{ homelab_domain }}"
+  dnsNames:
+  - "{{ homelab_domain }}"
+  - "*.{{ homelab_domain }}"

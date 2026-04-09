@@ -1,0 +1,5 @@
+# Usa assim:
+# ansible-galaxy install -r src/requirements.yml
+
+collections:
+  - name: kubernetes.core

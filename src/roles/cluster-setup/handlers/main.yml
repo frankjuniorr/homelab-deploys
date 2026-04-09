@@ -1,0 +1,16 @@
+---
+# Triggered by the 'Install Root CA into Arch Linux system trust store' task.
+# Rebuilds the system-wide CA bundle on Arch Linux (reads from /etc/ca-certificates/trust-source/anchors/).
+- name: "update-ca-trust-arch"
+  become: true
+  ansible.builtin.command:
+    cmd: update-ca-trust
+  changed_when: true
+
+# Triggered by the 'Install Root CA into Ubuntu/Debian system trust store' task.
+# Rebuilds the system-wide CA bundle on Ubuntu/Debian (reads from /usr/local/share/ca-certificates/).
+- name: "update-ca-trust-debian"
+  become: true
+  ansible.builtin.command:
+    cmd: update-ca-certificates
+  changed_when: true

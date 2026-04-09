@@ -1,0 +1,50 @@
+---
+##############################################
+# HELM CHART DEPLOYMENT — via helm CLI
+# Uses `helm upgrade --install` which is idempotent across re-runs.
+#
+# Dependency order matters:
+#   MetalLB       — up first so LoadBalancer Services can get IPs immediately.
+#   Envoy Gateway — OCI chart; --skip-crds avoids conflict with the Gateway API
+#                   CRDs already installed by gateway-api-crds.yml.
+#   cert-manager  — TLS lifecycle; --set installCRDs=true bundles its CRDs.
+##############################################
+
+- name: "Add Helm repos"
+  ansible.builtin.command:
+    cmd: "helm repo add {{ item.name }} {{ item.url }} --force-update"
+  loop:
+    - { name: metallb, url: "https://metallb.github.io/metallb" }
+    - { name: jetstack, url: "https://charts.jetstack.io" }
+  loop_control:
+    label: "{{ item.name }}"
+  changed_when: false
+
+- name: "Update Helm repo cache"
+  ansible.builtin.command:
+    cmd: helm repo update
+  changed_when: false
+
+- name: "Install infrastructure Helm charts"
+  ansible.builtin.command:
+    cmd: "helm upgrade --install {{ item.name }} {{ item.chart_ref }} --namespace {{ item.namespace }} --create-namespace --wait {{ item.extra_args | default('') }}"
+  loop:
+    # MetalLB: Layer 2 LoadBalancer
+    - name: metallb
+      chart_ref: metallb
+      namespace: "{{ namespace_metallb }}"
+      extra_args: "--version {{ metallb_version }} --repo https://metallb.github.io/metallb"
+    # Envoy Gateway: OCI chart — --skip-crds avoids conflict with gateway-api-crds.yml
+    - name: envoy-gateway
+      chart_ref: "oci://docker.io/envoyproxy/gateway-helm"
+      namespace: "{{ namespace_envoy }}"
+      extra_args: "--version {{ envoy_gateway_version }} --skip-crds"
+    # cert-manager: --set installCRDs=true bundles all cert-manager CRDs
+    - name: cert-manager
+      chart_ref: cert-manager
+      namespace: "{{ namespace_cert_manager }}"
+      extra_args: "--version {{ cert_manager_version }} --repo https://charts.jetstack.io --set installCRDs=true"
+  loop_control:
+    label: "{{ item.name }}"
+  register: helm_install
+  changed_when: "'has been upgraded' in helm_install.stdout or 'has been installed' in helm_install.stdout"
