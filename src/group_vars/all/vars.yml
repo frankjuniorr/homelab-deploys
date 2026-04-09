@@ -1,0 +1,67 @@
+---
+
+##############################################################
+# Privilege escalation — valor real fica em vault.yml (criptografado)
+##############################################################
+ansible_become_pass: "{{ vault_become_pass }}"
+
+##############################################################
+# Kubernetes namespaces
+##############################################################
+namespace_metallb: metallb-system
+namespace_envoy: envoy-gateway-system
+namespace_cert_manager: cert-manager
+namespace_gateway: gateway  # Dedicated namespace for the Gateway instance and its TLS certificate
+
+
+##############################################################
+# Gateway API (Ingress)
+##############################################################
+# Gateway
+gateway_name: my-gateway
+gateway_class_name: envoy-gateway-class
+
+# Gateway API CRDs version (Standard install manifest)
+gateway_api_version: v1.4.1
+gateway_api_crds_url: "https://github.com/kubernetes-sigs/gateway-api/releases/download/{{ gateway_api_version }}/standard-install.yaml"
+
+# Envoy Gateway Helm chart version (must match gateway_api_version)
+envoy_gateway_version: v1.7.1
+
+# MetalLB Helm chart version
+metallb_version: v0.15.3
+
+# cert-manager Helm chart version
+cert_manager_version: v1.20.1
+
+##############################################################
+# Certificate TLS
+##############################################################
+# cert-manager Root CA
+ca_secret_name: homelab-ca-tls
+ca_secret_namespace: "{{ namespace_cert_manager }}"
+wildcard_tls_secret_name: homelab-wildcard-tls
+homelab_ca_cn: "Homelab Internal Root CA"
+
+# Path where the Root CA PEM is written on the local machine (relative to playbook_dir = src/)
+ca_cert_local_path: "{{ playbook_dir }}/homelab-root-ca.crt"
+
+##############################################################
+# Domain and Load Balancer IP
+##############################################################
+# Internal domain — all services are exposed under *.{{ homelab_domain }}
+homelab_domain: frank.lab.io
+
+# MetalLB IP pool range (Layer 2 LoadBalancer)
+metallb_ip_pool: "192.168.1.200-192.168.1.205"
+
+##############################################################
+# Applications registry
+##############################################################
+# Each entry drives the role of the same name: role name = namespace name = app name.
+# Add new apps here; each one gets its own role under src/roles/<name>/.
+apps:
+  - name: podinfo
+    namespace: podinfo
+    domain: hello.{{ homelab_domain }}
+

@@ -1,6 +1,41 @@
 {
   "$schema": "https://docs.renovatebot.com/renovate-schema.json",
-  "extends": [
-    "config:recommended"
+  "extends": ["config:recommended"],
+  "customManagers": [
+    {
+      "description": "Envoy Gateway OCI Helm chart version",
+      "customType": "regex",
+      "fileMatch": ["^src/group_vars/all\\.yml$"],
+      "matchStrings": ["envoy_gateway_version:\\s*(?<currentValue>v[\\d.]+)"],
+      "datasourceTemplate": "docker",
+      "depNameTemplate": "docker.io/envoyproxy/gateway-helm",
+      "versioningTemplate": "docker"
+    },
+    {
+      "description": "Gateway API CRDs version (GitHub release)",
+      "customType": "regex",
+      "fileMatch": ["^src/group_vars/all\\.yml$"],
+      "matchStrings": ["gateway_api_version:\\s*(?<currentValue>v[\\d.]+)"],
+      "datasourceTemplate": "github-releases",
+      "depNameTemplate": "kubernetes-sigs/gateway-api"
+    },
+    {
+      "description": "MetalLB Helm chart version",
+      "customType": "regex",
+      "fileMatch": ["^src/group_vars/all\\.yml$"],
+      "matchStrings": ["metallb_version:\\s*(?<currentValue>v[\\d.]+)"],
+      "datasourceTemplate": "helm",
+      "depNameTemplate": "metallb",
+      "registryUrlTemplate": "https://metallb.github.io/metallb"
+    },
+    {
+      "description": "cert-manager Helm chart version",
+      "customType": "regex",
+      "fileMatch": ["^src/group_vars/all\\.yml$"],
+      "matchStrings": ["cert_manager_version:\\s*(?<currentValue>v[\\d.]+)"],
+      "datasourceTemplate": "helm",
+      "depNameTemplate": "cert-manager",
+      "registryUrlTemplate": "https://charts.jetstack.io"
+    }
   ]
 }

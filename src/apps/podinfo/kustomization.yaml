@@ -1,4 +1,0 @@
-resources:
-  - httproute.yaml
-  - deployment.yaml
-  - service.yaml

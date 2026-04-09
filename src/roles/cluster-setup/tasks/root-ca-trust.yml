@@ -1,0 +1,96 @@
+---
+##############################################
+# ROOT CA LOCAL TRUST INSTALLATION
+# cert-manager stores the generated Root CA in a Kubernetes Secret (homelab-ca-tls).
+# We extract it and install it into the local machine's OS trust store so that
+# all HTTPS requests to *.{{ homelab_domain }} are trusted without browser warnings.
+#
+# This file is imported with the 'ca-trust' tag, enabling `just install-ca` to
+# run this block in isolation — useful after a CA rotation or on a new machine
+# where the cluster is already running.
+##############################################
+
+- name: "Wait for cert-manager to generate the Root CA secret ({{ ca_secret_name }})"
+  # Polls until the Secret appears. cert-manager typically takes 5–15 seconds after
+  # the Certificate resource is applied. Fails after ~2.5 minutes (30 × 5s).
+  kubernetes.core.k8s_info:
+    api_version: v1
+    kind: Secret
+    name: "{{ ca_secret_name }}"
+    namespace: "{{ ca_secret_namespace }}"
+  register: ca_secret
+  until: ca_secret.resources | length > 0
+  retries: 30
+  delay: 5
+
+- name: "Decode Root CA PEM certificate from the Kubernetes Secret"
+  # The Secret's ca.crt field is base64-encoded. b64decode returns the raw PEM string
+  # that OS trust stores and certutil expect.
+  ansible.builtin.set_fact:
+    ca_cert_pem: "{{ ca_secret.resources[0].data['ca.crt'] | b64decode }}"
+
+- name: "Write Root CA certificate to local file"
+  ansible.builtin.copy:
+    content: "{{ ca_cert_pem }}"
+    dest: "{{ ca_cert_local_path }}"
+    mode: "0644"
+
+# --- OS trust store ---
+
+- name: "Install Root CA into Arch Linux system trust store"
+  # Arch: certs placed in /etc/ca-certificates/trust-source/anchors/ are picked up by update-ca-trust.
+  # The handler (update-ca-trust-arch) runs update-ca-trust after all tasks complete.
+  become: true
+  ansible.builtin.copy:
+    src: "{{ ca_cert_local_path }}"
+    dest: /etc/ca-certificates/trust-source/anchors/homelab-root-ca.crt
+    mode: "0644"
+  when: ansible_distribution == "Archlinux"
+  notify: update-ca-trust-arch
+
+- name: "Install Root CA into Ubuntu/Debian system trust store"
+  # Ubuntu/Debian: certs placed in /usr/local/share/ca-certificates/ are picked up by update-ca-certificates.
+  # The handler (update-ca-trust-debian) runs update-ca-certificates after all tasks complete.
+  become: true
+  ansible.builtin.copy:
+    src: "{{ ca_cert_local_path }}"
+    dest: /usr/local/share/ca-certificates/homelab-root-ca.crt
+    mode: "0644"
+  when: ansible_distribution in ["Ubuntu", "Debian"]
+  notify: update-ca-trust-debian
+
+# --- Browser NSS database injection (Chrome / Firefox) ---
+
+- name: "Check if certutil is available for browser NSS injection"
+  # certutil ships with: nss (Arch) or libnss3-tools (Ubuntu/Debian).
+  # If absent, the NSS steps below are silently skipped via 'when: certutil_check.rc == 0'.
+  ansible.builtin.command:
+    cmd: which certutil
+  register: certutil_check
+  changed_when: false
+  failed_when: false
+
+- name: "Find all browser NSS cert9.db databases under $HOME"
+  # Chrome and Firefox each keep one or more NSS databases (cert9.db).
+  # We inject into every database found so all browser profiles trust the CA.
+  ansible.builtin.find:
+    paths: "{{ ansible_env.HOME }}"
+    patterns: "cert9.db"
+    recurse: true
+  register: nss_databases
+  when: certutil_check.rc == 0
+
+- name: "Inject Root CA into each browser NSS database"
+  # certutil -A adds a trusted CA to a NSS database directory (identified by sql: prefix).
+  # Trust flags 'TC,,' = trusted CA for TLS (T) + trusted for client auth (C).
+  # dirname extracts the parent directory of each cert9.db file found above.
+  ansible.builtin.command:
+    cmd: >
+      certutil -A -n "Homelab Root CA" -t "TC,,"
+      -i {{ ca_cert_local_path }}
+      -d "sql:{{ item.path | dirname }}"
+  loop: "{{ nss_databases.files }}"
+  when: certutil_check.rc == 0
+  changed_when: true
+  loop_control:
+    label: "{{ item.path | dirname }}"

@@ -1,0 +1,35 @@
+---
+##############################################
+# BASE INFRASTRUCTURE CONFIGURATION
+# Applies the custom resources that wire the Helm charts together into
+# a working networking and TLS stack.
+#
+# All manifest files live in roles/cluster-setup/files/ so the role is self-contained.
+#
+# Application order within the loop is critical:
+#   gateway-namespace.yaml    → 'gateway' namespace (must exist before cert + Gateway below)
+#   metallb-config.yaml       → IPAddressPool + L2Advertisement (needs MetalLB CRDs)
+#   gatewayclass.yaml         → EnvoyProxy GatewayClass (needs Gateway API CRDs; cluster-scoped)
+#   cert-manager-issuer.yaml  → self-signed Issuer → Root CA cert → ClusterIssuer (needs cert-manager CRDs)
+#   certificate.yaml          → wildcard *.frank.lab.io cert in 'gateway' ns (needs ClusterIssuer above)
+#   gateway-api-instance.yaml → Gateway HTTP/HTTPS in 'gateway' ns (needs GatewayClass + wildcard TLS secret)
+##############################################
+- name: "Apply base infrastructure configuration manifests"
+  kubernetes.core.k8s:
+    state: present
+    definition: "{{ lookup('template', role_path + '/templates/' + item.file) | from_yaml_all | list }}"
+  loop:
+    # gateway-namespace.yaml.j2: dedicated namespace for the Gateway and its TLS certificate
+    - file: gateway-namespace.yaml.j2
+    # metallb-config.yaml.j2: IP pool range and L2 advertisement mode
+    - file: metallb-config.yaml.j2
+    # gatewayclass.yaml.j2: GatewayClass that the Envoy Gateway controller implements
+    - file: gatewayclass.yaml.j2
+    # cert-manager-issuer.yaml.j2: 3 documents — self-signed Issuer → Root CA cert → ClusterIssuer
+    - file: cert-manager-issuer.yaml.j2
+    # certificate.yaml.j2: wildcard cert for *.{{ homelab_domain }} in the gateway namespace
+    - file: certificate.yaml.j2
+    # gateway-api-instance.yaml.j2: HTTP (port 80) and HTTPS (port 443) listeners
+    - file: gateway-api-instance.yaml.j2
+  loop_control:
+    label: "{{ item.file }}"

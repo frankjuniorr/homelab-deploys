@@ -1,0 +1,46 @@
+---
+##############################################
+# CERTIFICATE RENEWAL GUARD
+# On a fresh install this entire block is a no-op (secret doesn't exist yet).
+# On re-runs, if the wildcard TLS secret was signed by a different (old or rotated)
+# Root CA, we delete it so cert-manager re-issues it using the current CA applied
+# in base-configs. Without this guard, a stale secret would remain indefinitely
+# and cause silent TLS verification failures.
+##############################################
+- name: "Check if a wildcard TLS secret already exists in the cluster"
+  # The wildcard TLS secret lives in the 'gateway' namespace alongside the Gateway resource.
+  kubernetes.core.k8s_info:
+    api_version: v1
+    kind: Secret
+    name: "{{ wildcard_tls_secret_name }}"
+    namespace: "{{ namespace_gateway }}"
+  register: wildcard_secret
+
+- name: "Write the existing wildcard TLS cert to a temp file for inspection"
+  # The Secret stores the certificate as base64 (data['tls.crt']).
+  # b64decode gives us the raw PEM that openssl can parse.
+  ansible.builtin.copy:
+    content: "{{ wildcard_secret.resources[0].data['tls.crt'] | b64decode }}"
+    dest: /tmp/homelab-tls-check.crt
+    mode: "0600"
+  when: wildcard_secret.resources | length > 0
+
+- name: "Read the issuer CN from the existing wildcard TLS certificate"
+  ansible.builtin.command:
+    cmd: openssl x509 -noout -issuer -in /tmp/homelab-tls-check.crt
+  register: cert_issuer_check
+  changed_when: false
+  when: wildcard_secret.resources | length > 0
+
+- name: "Delete outdated wildcard TLS secret to force re-issuance by the current Root CA"
+  # cert-manager detects the missing Secret and automatically re-issues the certificate
+  # from the ClusterIssuer defined in base-configs (cert-manager-issuer.yaml).
+  kubernetes.core.k8s:
+    api_version: v1
+    kind: Secret
+    name: "{{ wildcard_tls_secret_name }}"
+    namespace: "{{ namespace_gateway }}"
+    state: absent
+  when:
+    - wildcard_secret.resources | length > 0
+    - homelab_ca_cn not in cert_issuer_check.stdout

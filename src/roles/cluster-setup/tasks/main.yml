@@ -1,0 +1,19 @@
+---
+# cluster-setup role — bootstraps the full K3s cluster infrastructure.
+# Responsibilities are split into focused task files; each file maps to one section.
+# Use import_tasks (static) so role-level tags propagate correctly into each file.
+
+- ansible.builtin.import_tasks: gateway-api-crds.yml
+
+- ansible.builtin.import_tasks: helm-charts.yml
+
+- ansible.builtin.import_tasks: wait-for-crds.yml
+
+- ansible.builtin.import_tasks: cert-renewal-guard.yml
+
+- ansible.builtin.import_tasks: base-configs.yml
+
+- ansible.builtin.import_tasks: root-ca-trust.yml
+  tags: [ca-trust]  # Adds ca-trust to all tasks in this file; enables `just install-ca`
+
+- ansible.builtin.import_tasks: gateway-status.yml

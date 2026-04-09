@@ -1,0 +1,36 @@
+---
+##############################################
+# Cluster Setup
+# Bootstraps the full K3s cluster infrastructure:
+# Gateway API CRDs → Helm charts (MetalLB, Envoy, cert-manager)
+# → base configs (IP pool, Gateway, TLS CA, wildcard cert) → Root CA local trust
+##############################################
+- name: "Bootstrap K3s cluster infrastructure"
+  hosts: localhost
+  connection: local
+  gather_facts: true   # Required by root-ca-trust.yml for OS detection (ansible_distribution)
+  become: false
+
+  roles:
+    - role: cluster-setup
+      tags:
+        - setup
+        - infra
+
+##############################################
+# Applications
+# Each application is its own role. Role name = namespace name (convention).
+# Add new apps by creating a new role under src/roles/<app-name>/ and listing it here.
+##############################################
+- name: "Deploy applications"
+  hosts: localhost
+  connection: local
+  gather_facts: false
+  become: false
+
+  roles:
+    - role: podinfo
+      tags:
+        - setup
+        - apps
+        - podinfo

@@ -1,0 +1,36 @@
+---
+##############################################
+# PODINFO APPLICATION
+# App configuration is centralized in group_vars/all.yml under the 'apps' list.
+# The set_fact task loads this role's entry from the list so all subsequent tasks
+# reference app.name, app.namespace, and app.domain as single source of truth.
+#
+# The HTTPRoute attaches to {{ gateway_name }} in {{ namespace_gateway }}.
+# The Gateway's allowedRoutes.namespaces.from: All permits routes from any namespace,
+# so no ReferenceGrant is needed.
+#
+# To add a new application: add an entry to 'apps' in group_vars/all.yml,
+# then create a role under src/roles/<name>/ following this same pattern.
+##############################################
+
+- name: "Load app configuration from apps registry (group_vars/all.yml)"
+  # Finds this role's entry in the apps list by matching on 'name'.
+  # All subsequent tasks reference 'app.*' instead of hardcoded values.
+  ansible.builtin.set_fact:
+    app: "{{ apps | selectattr('name', 'eq', 'podinfo') | first }}"
+
+- name: "Deploy {{ app.name }} resources (namespace: {{ app.namespace }} | domain: {{ app.domain }})"
+  kubernetes.core.k8s:
+    state: present
+    definition: "{{ lookup('template', role_path + '/templates/' + item.file) | from_yaml_all | list }}"
+  loop:
+    # namespace.yaml.j2: creates the isolated namespace — name matches app.namespace from apps list
+    - file: namespace.yaml.j2
+    # deployment.yaml.j2: app container and replica config
+    - file: deployment.yaml.j2
+    # service.yaml.j2: ClusterIP service exposing the app internally
+    - file: service.yaml.j2
+    # httproute.yaml.j2: routes app.domain from the Gateway to the app's service
+    - file: httproute.yaml.j2
+  loop_control:
+    label: "{{ item.file }}"

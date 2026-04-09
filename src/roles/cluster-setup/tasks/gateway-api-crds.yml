@@ -1,0 +1,15 @@
+---
+##############################################
+# GATEWAY API CRDs
+# The Kubernetes Gateway API is not bundled with K3s; we install the
+# Standard CRDs manually. This defines GatewayClass, Gateway, HTTPRoute,
+# and related resources that Envoy Gateway will implement.
+# Must run before the Envoy Gateway Helm chart and before any Gateway objects.
+##############################################
+- name: "Install Kubernetes Gateway API Standard CRDs ({{ gateway_api_version }})"
+  ansible.builtin.command:
+    cmd: "kubectl apply -f {{ gateway_api_crds_url }}"
+  # kubectl apply -f <url> is used here because the manifest bundles 50+ CRD documents.
+  # Applying them via kubernetes.core.k8s would create 50+ individual Ansible tasks,
+  # making the output unreadable. kubectl handles the bundle natively in one call.
+  changed_when: true

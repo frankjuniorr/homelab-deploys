@@ -1,0 +1,29 @@
+---
+##############################################
+# GATEWAY STATUS CHECK
+# Confirms that MetalLB successfully assigned a LoadBalancer IP to the Gateway.
+# This is the final validation that the full networking stack is operational.
+# We poll status.addresses until an IP appears, then display it.
+##############################################
+- name: "Wait for MetalLB to assign a LoadBalancer IP to the Gateway"
+  # MetalLB watches for Services/Gateways of type LoadBalancer and assigns an IP
+  # from the pool defined in metallb-config.yaml. This usually takes a few seconds.
+  kubernetes.core.k8s_info:
+    api_version: gateway.networking.k8s.io/v1
+    kind: Gateway
+    name: "{{ gateway_name }}"
+    namespace: "{{ namespace_gateway }}"
+  register: gateway_info
+  until: >
+    gateway_info.resources | length > 0 and
+    gateway_info.resources[0].status is defined and
+    gateway_info.resources[0].status.addresses is defined and
+    gateway_info.resources[0].status.addresses | length > 0
+  retries: 12
+  delay: 10
+
+- name: "Display Gateway LoadBalancer IP"
+  ansible.builtin.debug:
+    msg: >
+      Gateway '{{ gateway_info.resources[0].metadata.name }}' is ready —
+      IP: {{ gateway_info.resources[0].status.addresses[0].value }}
