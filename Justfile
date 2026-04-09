@@ -1,7 +1,10 @@
 set shell := ["bash", "-c"]
 
+# Variáveis
+export VAULT_PASS_FILE := home_dir() + "/.config/homelab-iac/.vault_pass"
+
 # Helper para rodar ansible com inventário local
-ansible_cmd := "ansible-playbook -i " + quote(invocation_directory() + "/src/hosts.yaml")
+ansible_cmd := "ansible-playbook -i " + quote(invocation_directory() + "/src/hosts.yaml") + " --vault-password-file " + VAULT_PASS_FILE
 
 ############################################################################
 # INIT
@@ -39,6 +42,38 @@ deploy-apps:
 # Útil após rotação de CA ou em uma nova máquina com o cluster já rodando
 install-ca:
     cd src && {{ansible_cmd}} main.yaml --tags "ca-trust"
+
+############################################################################
+# SECRETS (Ansible-Vault)
+############################################################################
+# Cria um novo arquivo de senha para o vault se não existir em ~/.config/homelab-iac/.vault_pass
+secrets-keygen:
+    @test ! -d ~/.config/homelab-iac && mkdir -p ~/.config/homelab-iac
+    @test ! -f {{VAULT_PASS_FILE}} && openssl rand -base64 32 > {{VAULT_PASS_FILE}} && chmod 600 {{VAULT_PASS_FILE}} || echo "Vault password file already exists"
+
+# Criptografa o arquivo vault.yml (Garante segurança no Git)
+secrets-encrypt:
+    @if ! grep -q "\$ANSIBLE_VAULT" src/group_vars/all/vault.yml; then \
+        ansible-vault encrypt src/group_vars/all/vault.yml --vault-password-file {{VAULT_PASS_FILE}} && echo "src/group_vars/all/vault.yml encrypted"; \
+    else \
+        echo "src/group_vars/all/vault.yml already encrypted"; \
+    fi
+
+# Abre o vault.yml criptografado diretamente no editor padrão
+secrets-edit:
+    ansible-vault edit src/group_vars/all/vault.yml --vault-password-file {{VAULT_PASS_FILE}}
+
+# Descriptografa o vault.yml permanentemente (use com cautela)
+secrets-decrypt:
+    @if grep -q "\$ANSIBLE_VAULT" src/group_vars/all/vault.yml; then \
+        ansible-vault decrypt src/group_vars/all/vault.yml --vault-password-file {{VAULT_PASS_FILE}} && echo "src/group_vars/all/vault.yml decrypted"; \
+    else \
+        echo "src/group_vars/all/vault.yml is already decrypted"; \
+    fi
+
+# Apenas visualiza os segredos descriptografados no terminal
+secrets-view:
+    ansible-vault view src/group_vars/all/vault.yml --vault-password-file {{VAULT_PASS_FILE}}
 
 ############################################################################
 # UTILS

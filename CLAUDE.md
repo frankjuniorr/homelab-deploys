@@ -18,6 +18,8 @@ All entry points go through `just` (the Justfile task runner). The legacy `setup
 
 ```bash
 # First-time setup
+just secrets-keygen    # Generate vault password at ~/.config/homelab-iac/.vault_pass
+just secrets-edit      # Edit encrypted vault.yml (decrypt → edit → re-encrypt)
 just init              # Install hooks + Ansible Galaxy collections + check dependencies
 
 # Deployment
@@ -25,6 +27,11 @@ just deploy            # Full deploy (namespaces + CRDs + infra + apps + Root CA
 just deploy-infra      # Only infra layer (namespaces, CRDs, Helm charts, base configs)
 just deploy-apps       # Only applications (podinfo and any new apps)
 just install-ca        # Only install Root CA into OS trust store and browser NSS databases
+
+# Secrets
+just secrets-view      # View decrypted vault.yml in terminal
+just secrets-encrypt   # Encrypt vault.yml (run before committing if manually decrypted)
+just secrets-decrypt   # Decrypt vault.yml permanently (use with caution)
 
 # Debugging
 just plugin off        # Disable aesthetic plugin to see raw Ansible output
@@ -150,11 +157,19 @@ No resources are placed in the `default` namespace. Each concern has its own nam
 ## Key Domain
 Internal services are exposed under `*.frank.lab.io` via the Gateway (`gateway` namespace) with a wildcard TLS listener. The Gateway IP is assigned from MetalLB's pool (`192.168.1.200–192.168.1.205`) and displayed at the end of the `cluster-setup` role.
 
+## Secrets Management
+
+- `src/group_vars/all/vault.yml` is **always encrypted** in Git — the pre-commit hook blocks unencrypted commits
+- Vault password lives at `~/.config/homelab-iac/.vault_pass` (must be `chmod 600`)
+- Use `just secrets-edit` for all edits (atomic decrypt/edit/re-encrypt)
+- If you manually decrypt, always run `just secrets-encrypt` before committing
+- All `ansible-playbook` invocations automatically pass `--vault-password-file` via `ansible_cmd`
+
 ## Gotchas
 
 - The **beautiful_output** callback plugin can hide error details — run `just plugin off` when debugging
 - `kubernetes.core` collection requires the `kubernetes` Python library (`pip3 install kubernetes`)
 - `beautiful_output.py` requires the `watchdog` Python library
-- Pre-commit hook auto-enables the aesthetic plugin; run `just install-hooks` after modifying `scripts/pre-commit.sh`
+- Pre-commit hook checks vault encryption and auto-enables the aesthetic plugin; run `just install-hooks` after modifying `scripts/pre-commit.sh`
 - CA trust installation tasks use `become: true` at the task level (not the play level)
 - `just install-ca` (`--tags ca-trust`) assumes the cluster is already deployed; it only re-runs the CA extraction and local trust installation steps

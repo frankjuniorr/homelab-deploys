@@ -1,6 +1,11 @@
 ---
 
 ##############################################################
+# Privilege escalation — valor real fica em vault.yml (criptografado)
+##############################################################
+ansible_become_pass: "{{ vault_become_pass }}"
+
+##############################################################
 # Kubernetes namespaces
 ##############################################################
 namespace_metallb: metallb-system
