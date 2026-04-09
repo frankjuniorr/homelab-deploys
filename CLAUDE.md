@@ -165,6 +165,10 @@ Internal services are exposed under `*.frank.lab.io` via the Gateway (`gateway` 
 - If you manually decrypt, always run `just secrets-encrypt` before committing
 - All `ansible-playbook` invocations automatically pass `--vault-password-file` via `ansible_cmd`
 
+## README Maintenance
+
+Whenever a structural change is made to the project — new role, new `just` command, changed prerequisites, updated project layout, or new secrets workflow — **review and update `README.md`** to keep it in sync. The README is the public-facing entry point and must always reflect the actual state of the codebase.
+
 ## Gotchas
 
 - The **beautiful_output** callback plugin can hide error details — run `just plugin off` when debugging
