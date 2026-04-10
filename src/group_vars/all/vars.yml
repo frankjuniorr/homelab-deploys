@@ -6,38 +6,51 @@
 ansible_become_pass: "{{ vault_become_pass }}"
 
 ##############################################################
-# Kubernetes namespaces
+# Namespaces
 ##############################################################
 namespace_metallb: metallb-system
 namespace_envoy: envoy-gateway-system
 namespace_cert_manager: cert-manager
-namespace_gateway: gateway  # Dedicated namespace for the Gateway instance and its TLS certificate
+namespace_gateway: gateway        # Gateway instance + wildcard TLS cert
+monitoring_namespace: monitoring  # Prometheus + Grafana (kube-prometheus-stack)
+longhorn_namespace: longhorn-system
 
+##############################################################
+# Versions
+##############################################################
+gateway_api_version: v1.4.1
+envoy_gateway_version: v1.7.1
+metallb_version: v0.15.3
+cert_manager_version: v1.20.1
+kube_prometheus_stack_version: "69.7.4"
+longhorn_version: "1.7.2"
+loki_version: "6.7.4"
+promtail_version: "6.16.6"
+
+##############################################################
+# Domains
+##############################################################
+# Internal domain — all services are exposed under *.{{ homelab_domain }}
+homelab_domain: frank.lab.io
+monitoring_grafana_domain: "grafana.{{ homelab_domain }}"
+monitoring_prometheus_domain: "prometheus.{{ homelab_domain }}"
+longhorn_domain: "longhorn.{{ homelab_domain }}"
 
 ##############################################################
 # Gateway API (Ingress)
 ##############################################################
-# Gateway
 gateway_name: my-gateway
 gateway_class_name: envoy-gateway-class
-
-# Gateway API CRDs version (Standard install manifest)
-gateway_api_version: v1.4.1
 gateway_api_crds_url: "https://github.com/kubernetes-sigs/gateway-api/releases/download/{{ gateway_api_version }}/standard-install.yaml"
 
-# Envoy Gateway Helm chart version (must match gateway_api_version)
-envoy_gateway_version: v1.7.1
-
-# MetalLB Helm chart version
-metallb_version: v0.15.3
-
-# cert-manager Helm chart version
-cert_manager_version: v1.20.1
+##############################################################
+# MetalLB
+##############################################################
+metallb_ip_pool: "192.168.1.200-192.168.1.205"
 
 ##############################################################
 # Certificate TLS
 ##############################################################
-# cert-manager Root CA
 ca_secret_name: homelab-ca-tls
 ca_secret_namespace: "{{ namespace_cert_manager }}"
 wildcard_tls_secret_name: homelab-wildcard-tls
@@ -47,13 +60,56 @@ homelab_ca_cn: "Homelab Internal Root CA"
 ca_cert_local_path: "{{ playbook_dir }}/homelab-root-ca.crt"
 
 ##############################################################
-# Domain and Load Balancer IP
+# Longhorn Backup (Garage S3 — LXC on Proxmox)
 ##############################################################
-# Internal domain — all services are exposed under *.{{ homelab_domain }}
-homelab_domain: frank.lab.io
+longhorn_backup_bucket: homelab-longhorn
+longhorn_backup_region: homelab
+longhorn_backup_target: "s3://{{ longhorn_backup_bucket }}@{{ longhorn_backup_region }}/"
+longhorn_backup_credential_secret: longhorn-backup-secret
+longhorn_s3_endpoint: "http://192.168.1.52:3900"
+longhorn_backup_access_key: "{{ vault_longhorn_backup_access_key }}"
+longhorn_backup_secret_key: "{{ vault_longhorn_backup_secret_key }}"
 
-# MetalLB IP pool range (Layer 2 LoadBalancer)
-metallb_ip_pool: "192.168.1.200-192.168.1.205"
+##############################################################
+# Monitoring (kube-prometheus-stack)
+##############################################################
+# Admin password comes from vault.yml — add via: just secrets-edit
+grafana_admin_password: "{{ vault_grafana_admin_password }}"
+
+##############################################################
+# Resource limits (tune here to control cluster RAM usage)
+##############################################################
+# Prometheus
+prometheus_retention:  "5d"
+prometheus_req_cpu:    "100m"
+prometheus_req_mem:    "256Mi"
+prometheus_lim_cpu:    "500m"
+prometheus_lim_mem:    "512Mi"
+
+# Grafana
+grafana_req_cpu:       "50m"
+grafana_req_mem:       "128Mi"
+grafana_lim_cpu:       "200m"
+grafana_lim_mem:       "300Mi"
+
+# Alertmanager
+alertmanager_req_cpu:  "10m"
+alertmanager_req_mem:  "32Mi"
+alertmanager_lim_cpu:  "100m"
+alertmanager_lim_mem:  "64Mi"
+
+# Loki
+loki_retention:        "72h"
+loki_req_cpu:          "50m"
+loki_req_mem:          "64Mi"
+loki_lim_cpu:          "200m"
+loki_lim_mem:          "128Mi"
+
+# Longhorn manager (per node — 3 nodes in cluster)
+longhorn_manager_req_cpu:  "50m"
+longhorn_manager_req_mem:  "100Mi"
+longhorn_manager_lim_cpu:  "300m"
+longhorn_manager_lim_mem:  "200Mi"
 
 ##############################################################
 # Applications registry
@@ -64,4 +120,3 @@ apps:
   - name: podinfo
     namespace: podinfo
     domain: hello.{{ homelab_domain }}
-

@@ -1,0 +1,60 @@
+---
+##############################################
+# LONGHORN ROLE
+# Deploys Longhorn distributed block storage via Helm.
+# Longhorn becomes the default StorageClass for the cluster.
+#
+# UI      → longhorn.frank.lab.io (service: longhorn-frontend:80)
+# Backups → s3://homelab-longhorn@homelab/ via Garage (http://192.168.1.52:3900)
+#           Credentials in vault.yml: vault_longhorn_backup_access_key / vault_longhorn_backup_secret_key
+#
+# PREREQUISITES (must be installed on each K3s node via homelab-iac):
+#   - open-iscsi   (apt install open-iscsi / dnf install iscsi-initiator-utils)
+#   - nfs-common   (apt install nfs-common) — required for RWX volumes
+#
+# Note: longhorn-system is the Longhorn standard namespace (exception to the
+#       role-name = namespace-name convention used by app roles).
+##############################################
+
+- name: "Add Longhorn Helm repo"
+  ansible.builtin.command:
+    cmd: helm repo add longhorn https://charts.longhorn.io --force-update
+  changed_when: false
+
+- name: "Update Helm repo cache"
+  ansible.builtin.command:
+    cmd: helm repo update
+  changed_when: false
+
+- name: "Write Longhorn Helm values to temp file"
+  ansible.builtin.template:
+    src: longhorn-values.yaml.j2
+    dest: /tmp/longhorn-values.yaml
+    mode: "0600"
+
+- name: "Install Longhorn (distributed block storage)"
+  ansible.builtin.command:
+    cmd: >
+      helm upgrade --install longhorn longhorn/longhorn
+      --namespace {{ longhorn_namespace }}
+      --create-namespace
+      --version {{ longhorn_version }}
+      --wait
+      --values /tmp/longhorn-values.yaml
+  register: helm_longhorn
+  changed_when: "'has been upgraded' in helm_longhorn.stdout or 'has been installed' in helm_longhorn.stdout"
+
+- name: "Remove temporary Helm values file"
+  ansible.builtin.file:
+    path: /tmp/longhorn-values.yaml
+    state: absent
+
+- name: "Apply Longhorn backup credentials secret"
+  kubernetes.core.k8s:
+    state: present
+    definition: "{{ lookup('template', role_path + '/templates/backup-secret.yaml.j2') | from_yaml }}"
+
+- name: "Apply Longhorn UI HTTPRoute (longhorn.{{ homelab_domain }})"
+  kubernetes.core.k8s:
+    state: present
+    definition: "{{ lookup('template', role_path + '/templates/httproute.yaml.j2') | from_yaml }}"

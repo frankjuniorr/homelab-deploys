@@ -10,6 +10,9 @@
   connection: local
   gather_facts: true   # Required by root-ca-trust.yml for OS detection (ansible_distribution)
   become: false
+  tags:
+    - setup
+    - infra
 
   roles:
     - role: cluster-setup
@@ -27,6 +30,9 @@
   connection: local
   gather_facts: false
   become: false
+  tags:
+    - setup
+    - apps
 
   roles:
     - role: podinfo
@@ -34,3 +40,15 @@
         - setup
         - apps
         - podinfo
+
+    - role: monitoring
+      tags:
+        - setup
+        - apps
+        - monitoring
+
+    - role: longhorn
+      tags:
+        - setup
+        - apps
+        - longhorn

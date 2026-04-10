@@ -1,0 +1,13 @@
+defaultSettings:
+  backupTarget: "{{ longhorn_backup_target }}"
+  backupTargetCredentialSecret: "{{ longhorn_backup_credential_secret }}"
+
+# Cap memory per manager pod — 3 nodes × {{ longhorn_manager_lim_mem }} = max total
+longhornManager:
+  resources:
+    requests:
+      cpu: "{{ longhorn_manager_req_cpu }}"
+      memory: "{{ longhorn_manager_req_mem }}"
+    limits:
+      cpu: "{{ longhorn_manager_lim_cpu }}"
+      memory: "{{ longhorn_manager_lim_mem }}"

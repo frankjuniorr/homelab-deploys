@@ -1,3 +1,7 @@
 
 # Certificados gerados pelo código
 *.crt
+
+# Python bytecode (gerado automaticamente ao rodar plugins Ansible)
+__pycache__/
+*.pyc

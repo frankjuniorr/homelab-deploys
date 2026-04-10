@@ -2,6 +2,7 @@
 
 # Função: check_encrypt_vault_file
 # Objetivo: Verificar se o vault.yml contém os metadados do Ansible-Vault antes de permitir o commit.
+#           Se não estiver criptografado, criptografa automaticamente e re-adiciona ao stage.
 check_encrypt_vault_file() {
   VAULT_FILE="src/group_vars/all/vault.yml"
 
@@ -10,15 +11,10 @@ check_encrypt_vault_file() {
     if git show :"$VAULT_FILE" | grep -q "\$ANSIBLE_VAULT"; then
       return 0 # Sucesso: o arquivo está encriptado, continua para a próxima função
     else
-      echo "------------------------------------------------------------------------"
-      echo "❌ ERROR: $VAULT_FILE is NOT encrypted in the git stage!"
-      echo "------------------------------------------------------------------------"
-      echo "Steps to fix:"
-      echo "1. Run: just secrets-encrypt"
-      echo "2. Run: git add $VAULT_FILE"
-      echo "3. Try to commit again."
-      echo "------------------------------------------------------------------------"
-      exit 1 # Falha: interrompe o commit
+      echo "⚠️  $VAULT_FILE is not encrypted. Encrypting automatically..."
+      just secrets-encrypt
+      git add "$VAULT_FILE"
+      echo "✅ $VAULT_FILE encrypted and re-staged."
     fi
   fi
 }

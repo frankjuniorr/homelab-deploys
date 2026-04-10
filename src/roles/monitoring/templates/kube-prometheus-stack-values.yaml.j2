@@ -1,0 +1,36 @@
+grafana:
+  adminPassword: "{{ grafana_admin_password }}"
+  resources:
+    requests:
+      cpu: "{{ grafana_req_cpu }}"
+      memory: "{{ grafana_req_mem }}"
+    limits:
+      cpu: "{{ grafana_lim_cpu }}"
+      memory: "{{ grafana_lim_mem }}"
+  additionalDataSources:
+    - name: Loki
+      type: loki
+      url: http://loki.{{ monitoring_namespace }}.svc.cluster.local:3100
+      access: proxy
+      isDefault: false
+
+prometheus:
+  prometheusSpec:
+    retention: "{{ prometheus_retention }}"
+    resources:
+      requests:
+        cpu: "{{ prometheus_req_cpu }}"
+        memory: "{{ prometheus_req_mem }}"
+      limits:
+        cpu: "{{ prometheus_lim_cpu }}"
+        memory: "{{ prometheus_lim_mem }}"
+
+alertmanager:
+  alertmanagerSpec:
+    resources:
+      requests:
+        cpu: "{{ alertmanager_req_cpu }}"
+        memory: "{{ alertmanager_req_mem }}"
+      limits:
+        cpu: "{{ alertmanager_lim_cpu }}"
+        memory: "{{ alertmanager_lim_mem }}"

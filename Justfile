@@ -20,28 +20,28 @@ install-hooks:
 # 1. Verifica dependências (kubectl, helm, kustomize, ansible, python libs)
 # 2. Instala coleções Ansible do Galaxy (kubernetes.core)
 init: install-hooks
-    ./scripts/check_dependencies.sh
-    ansible-galaxy install -r src/requirements.yml
+    @./scripts/check_dependencies.sh
+    @ansible-galaxy collection install -r src/requirements.yml
 
 ############################################################################
 # DEPLOY
 ############################################################################
 # Deploy completo: cluster-setup (namespaces + CRDs + Helm + configs + CA trust) + apps
 deploy: init
-    cd src && {{ansible_cmd}} main.yaml --tags "setup"
+    @cd src && {{ansible_cmd}} main.yaml --tags "setup"
 
 # Deploy apenas a infraestrutura do cluster (sem apps)
 deploy-infra:
-    cd src && {{ansible_cmd}} main.yaml --tags "infra"
+    @cd src && {{ansible_cmd}} main.yaml --tags "infra"
 
 # Deploy apenas as aplicações (requer cluster já configurado)
 deploy-apps:
-    cd src && {{ansible_cmd}} main.yaml --tags "apps"
+    @cd src && {{ansible_cmd}} main.yaml --tags "apps"
 
 # Instala apenas o certificado Root CA no trust store local e navegadores
 # Útil após rotação de CA ou em uma nova máquina com o cluster já rodando
 install-ca:
-    cd src && {{ansible_cmd}} main.yaml --tags "ca-trust"
+    @cd src && {{ansible_cmd}} main.yaml --tags "ca-trust"
 
 ############################################################################
 # SECRETS (Ansible-Vault)
@@ -61,7 +61,7 @@ secrets-encrypt:
 
 # Abre o vault.yml criptografado diretamente no editor padrão
 secrets-edit:
-    ansible-vault edit src/group_vars/all/vault.yml --vault-password-file {{VAULT_PASS_FILE}}
+    @ansible-vault edit src/group_vars/all/vault.yml --vault-password-file {{VAULT_PASS_FILE}}
 
 # Descriptografa o vault.yml permanentemente (use com cautela)
 secrets-decrypt:
@@ -73,7 +73,7 @@ secrets-decrypt:
 
 # Apenas visualiza os segredos descriptografados no terminal
 secrets-view:
-    ansible-vault view src/group_vars/all/vault.yml --vault-password-file {{VAULT_PASS_FILE}}
+    @ansible-vault view src/group_vars/all/vault.yml --vault-password-file {{VAULT_PASS_FILE}}
 
 ############################################################################
 # UTILS

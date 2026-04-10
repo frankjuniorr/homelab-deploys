@@ -121,9 +121,10 @@ Generated `*.crt` files are gitignored.
 Follows the same conventions as `homelab-iac`:
 - **Task names**: always in double quotes, written in English
 - **Inventory format**: YAML only — `.ini` format is prohibited
-- **Module priority**: always prefer `kubernetes.core.*` over `ansible.builtin.command`/`shell`; use `command` only when a module genuinely cannot do the job (e.g., `kubectl apply -f <url>` for a 50+ document CRD bundle)
+- **Module priority**: always prefer `kubernetes.core.k8s` / `kubernetes.core.k8s_info` for applying and querying manifests. **Never use `kubernetes.core.helm`** — it has version compatibility issues with the local Helm CLI; use `ansible.builtin.command` with `helm upgrade --install` instead (idempotent, predictable, matches the pattern in `cluster-setup/tasks/helm-charts.yml`). Use `ansible.builtin.command` / `shell` only when no module can genuinely do the job (e.g., `kubectl apply -f <url>` for a multi-document CRD bundle).
 - **Idempotency**: all roles must be safe to run multiple times
 - **`gather_facts`**: set `false` by default; `cluster-setup` uses `true` because CA trust installation requires OS detection (`ansible_distribution`)
+- **Loop over identical tasks**: never write multiple tasks that do the same thing differing only in the target resource. Collapse them into a single `kubernetes.core.k8s` task with `loop` + `loop_control.label`. See `roles/podinfo/tasks/main.yml` and `roles/monitoring/tasks/main.yml` as reference.
 
 ### Adding a New Application
 Each application is its own role. **Role name = namespace name = app name** (convention).
@@ -164,6 +165,19 @@ Internal services are exposed under `*.frank.lab.io` via the Gateway (`gateway` 
 - Use `just secrets-edit` for all edits (atomic decrypt/edit/re-encrypt)
 - If you manually decrypt, always run `just secrets-encrypt` before committing
 - All `ansible-playbook` invocations automatically pass `--vault-password-file` via `ansible_cmd`
+
+### Manipulating vault.yml programmatically (Claude)
+
+To add or update secrets in `vault.yml` without the interactive editor:
+1. `just secrets-decrypt` — decrypt in place
+2. Edit `src/group_vars/all/vault.yml` with the Edit/Write tool
+3. `just secrets-encrypt` — re-encrypt before any commit
+
+Never leave `vault.yml` decrypted after editing. Always run step 3 immediately after step 2.
+
+## Renovate Maintenance
+
+Whenever a version variable is added or modified in `src/group_vars/all/vars.yml`, add or update the corresponding `customManagers` entry in `renovate.json` so Renovate can track and auto-update it. Each entry needs: `fileMatch` pointing to `vars.yml`, a `matchStrings` regex capturing the version value, and the correct `datasourceTemplate` + `depNameTemplate` + `registryUrlTemplate` for the upstream source (Helm registry, GitHub releases, or Docker registry).
 
 ## README Maintenance
 
