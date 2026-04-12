@@ -12,7 +12,9 @@ namespace_metallb: metallb-system
 namespace_envoy: envoy-gateway-system
 namespace_cert_manager: cert-manager
 namespace_gateway: gateway        # Gateway instance + wildcard TLS cert
-monitoring_namespace: monitoring  # Prometheus + Grafana (kube-prometheus-stack)
+namespace_prometheus: prometheus   # kube-prometheus-stack (Prometheus + Alertmanager)
+namespace_grafana: grafana         # Grafana (standalone)
+namespace_loki: loki               # Loki + Promtail
 longhorn_namespace: longhorn-system
 
 ##############################################################
@@ -26,6 +28,7 @@ kube_prometheus_stack_version: "69.7.4"
 longhorn_version: "1.7.2"
 loki_version: "6.7.4"
 promtail_version: "6.16.6"
+grafana_version: "8.10.4"
 
 ##############################################################
 # Domains

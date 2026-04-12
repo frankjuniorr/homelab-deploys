@@ -153,6 +153,9 @@ No resources are placed in the `default` namespace. Each concern has its own nam
 | `cert-manager` | cert-manager controller (created by Helm) |
 | `gateway` | Gateway instance + wildcard TLS certificate/secret |
 | `podinfo` | podinfo Deployment, Service, HTTPRoute |
+| `prometheus` | kube-prometheus-stack (Prometheus + Alertmanager + kube-state-metrics + node-exporter) |
+| `grafana` | Grafana standalone (dashboards + datasources for Prometheus and Loki) |
+| `loki` | Loki (log aggregation) + Promtail (log collector DaemonSet) |
 | `<app-name>` | any future application role |
 
 ## Key Domain
@@ -182,6 +185,23 @@ Whenever a version variable is added or modified in `src/group_vars/all/vars.yml
 ## README Maintenance
 
 Whenever a structural change is made to the project — new role, new `just` command, changed prerequisites, updated project layout, or new secrets workflow — **review and update `README.md`** to keep it in sync. The README is the public-facing entry point and must always reflect the actual state of the codebase.
+
+## Skills
+
+Always invoke the appropriate skill via the `Skill` tool before doing work that matches one of the entries below. Do not duplicate what the skill already does.
+
+| Trigger | Skill / Agent |
+|---|---|
+| **Any Kubernetes troubleshooting** (pod crashes, CrashLoopBackOff, service connectivity, cert-manager, gateway, Helm failures, node pressure) | sub-agent `k8s-troubleshooter` (via `Agent` tool) |
+| Creating/editing Kubernetes manifests, debugging pod crashes, resource limits, network policies | `kubernetes-specialist` |
+| Writing Dockerfiles, CI/CD pipelines, GitHub Actions, infrastructure-as-code | `devops-engineer` |
+| Setting up observability, deployment strategies, container configuration | `devops-infrastructure` |
+| Committing changes, writing commit messages | sub-agent `git-specialist` (via `Agent` tool) |
+| Any `gh` CLI operation (issues, PRs, releases, checks) | sub-agent `git-specialist` (via `Agent` tool) |
+| Refactoring Ansible roles or any code for maintainability | `refactor` |
+| Updating or creating `README.md` | `create-readme` |
+| Improving or auditing `CLAUDE.md` | `claude-md-improver` |
+| Diagnosing Linux/Arch Linux system issues (pacman, systemd, boot, filesystem, network, performance) | sub-agent `linux-specialist` (via `Agent` tool) |
 
 ## Gotchas
 

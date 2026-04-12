@@ -32,6 +32,9 @@ This project automates the configuration of critical components for daily homela
 | **MetalLB** | Layer 2 LoadBalancer for assigning local network IPs (e.g., `192.168.1.200`). |
 | **Envoy Gateway** | Gateway API implementation for traffic routing and TLS termination. |
 | **cert-manager** | Automatic TLS certificate issuance via Self-Signed ClusterIssuer (ECDSA-256). |
+| **Prometheus** | Metrics collection via kube-prometheus-stack (namespace: `prometheus`). |
+| **Grafana** | Standalone dashboards with Prometheus + Loki datasources (namespace: `grafana`). |
+| **Loki + Promtail** | Log aggregation and collection (namespace: `loki`). |
 | **Podinfo** | Demo application used to validate the entire stack's functionality. |
 
 ---

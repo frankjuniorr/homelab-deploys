@@ -1,0 +1,24 @@
+adminPassword: "{{ grafana_admin_password }}"
+
+resources:
+  requests:
+    cpu: "{{ grafana_req_cpu }}"
+    memory: "{{ grafana_req_mem }}"
+  limits:
+    cpu: "{{ grafana_lim_cpu }}"
+    memory: "{{ grafana_lim_mem }}"
+
+datasources:
+  datasources.yaml:
+    apiVersion: 1
+    datasources:
+      - name: Prometheus
+        type: prometheus
+        url: http://kube-prometheus-stack-prometheus.{{ namespace_prometheus }}.svc.cluster.local:9090
+        access: proxy
+        isDefault: true
+      - name: Loki
+        type: loki
+        url: http://loki.{{ namespace_loki }}.svc.cluster.local:3100
+        access: proxy
+        isDefault: false

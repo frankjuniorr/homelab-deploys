@@ -1,17 +1,18 @@
 ---
 ##############################################
 # MONITORING ROLE
-# Deploys the full observability stack in the 'monitoring' namespace:
-#   - kube-prometheus-stack: Prometheus + Grafana + kube-state-metrics + node-exporter
-#   - Loki:                  Log aggregation (single binary mode)
-#   - Promtail:              DaemonSet log collector — ships pod logs to Loki
+# Deploys the full observability stack across dedicated namespaces:
+#   - kube-prometheus-stack: Prometheus + Alertmanager + kube-state-metrics + node-exporter (ns: prometheus)
+#   - Grafana:               Standalone dashboards + datasources (ns: grafana)
+#   - Loki:                  Log aggregation (single binary mode) (ns: loki)
+#   - Promtail:              DaemonSet log collector — ships pod logs to Loki (ns: loki)
 #
-# Grafana     → grafana.frank.lab.io     (service: kube-prometheus-stack-grafana:80)
+# Grafana     → grafana.frank.lab.io     (service: grafana:80)
 # Prometheus  → prometheus.frank.lab.io  (service: kube-prometheus-stack-prometheus:9090)
 # Loki        → internal only            (service: loki:3100)
 #
 # Grafana admin password: vault_grafana_admin_password (vault.yml) — add via: just secrets-edit
-# Loki datasource is pre-configured in Grafana via kube-prometheus-stack-values.yaml.j2
+# Loki datasource is pre-configured in Grafana via grafana-values.yaml.j2
 ##############################################
 
 - name: "Add Helm repos (prometheus-community + grafana)"
@@ -37,14 +38,15 @@
   loop:
     - { src: kube-prometheus-stack-values.yaml.j2, dest: /tmp/kube-prometheus-stack-values.yaml }
     - { src: loki-values.yaml.j2,                  dest: /tmp/loki-values.yaml }
+    - { src: grafana-values.yaml.j2,               dest: /tmp/grafana-values.yaml }
   loop_control:
     label: "{{ item.src }}"
 
-- name: "Install kube-prometheus-stack (Prometheus + Grafana + kube-state-metrics)"
+- name: "Install kube-prometheus-stack (Prometheus + Alertmanager + kube-state-metrics)"
   ansible.builtin.command:
     cmd: >
       helm upgrade --install kube-prometheus-stack prometheus-community/kube-prometheus-stack
-      --namespace {{ monitoring_namespace }}
+      --namespace {{ namespace_prometheus }}
       --create-namespace
       --version {{ kube_prometheus_stack_version }}
       --wait
@@ -52,11 +54,24 @@
   register: helm_kps
   changed_when: "'has been upgraded' in helm_kps.stdout or 'has been installed' in helm_kps.stdout"
 
+- name: "Install Grafana (standalone — dashboards + datasources)"
+  ansible.builtin.command:
+    cmd: >
+      helm upgrade --install grafana grafana/grafana
+      --namespace {{ namespace_grafana }}
+      --create-namespace
+      --version {{ grafana_version }}
+      --wait
+      --values /tmp/grafana-values.yaml
+  register: helm_grafana
+  changed_when: "'has been upgraded' in helm_grafana.stdout or 'has been installed' in helm_grafana.stdout"
+
 - name: "Install Loki (log aggregation, single binary + filesystem storage)"
   ansible.builtin.command:
     cmd: >
       helm upgrade --install loki grafana/loki
-      --namespace {{ monitoring_namespace }}
+      --namespace {{ namespace_loki }}
+      --create-namespace
       --version {{ loki_version }}
       --wait
       --values /tmp/loki-values.yaml
@@ -67,10 +82,11 @@
   ansible.builtin.command:
     cmd: >
       helm upgrade --install promtail grafana/promtail
-      --namespace {{ monitoring_namespace }}
+      --namespace {{ namespace_loki }}
+      --create-namespace
       --version {{ promtail_version }}
       --wait
-      --set config.clients[0].url=http://loki.{{ monitoring_namespace }}.svc.cluster.local:3100/loki/api/v1/push
+      --set config.clients[0].url=http://loki.{{ namespace_loki }}.svc.cluster.local:3100/loki/api/v1/push
   register: helm_promtail
   changed_when: "'has been upgraded' in helm_promtail.stdout or 'has been installed' in helm_promtail.stdout"
 
@@ -81,6 +97,7 @@
   loop:
     - /tmp/kube-prometheus-stack-values.yaml
     - /tmp/loki-values.yaml
+    - /tmp/grafana-values.yaml
   loop_control:
     label: "{{ item }}"
 

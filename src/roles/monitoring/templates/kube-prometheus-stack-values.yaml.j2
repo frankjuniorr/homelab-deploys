@@ -1,18 +1,5 @@
 grafana:
-  adminPassword: "{{ grafana_admin_password }}"
-  resources:
-    requests:
-      cpu: "{{ grafana_req_cpu }}"
-      memory: "{{ grafana_req_mem }}"
-    limits:
-      cpu: "{{ grafana_lim_cpu }}"
-      memory: "{{ grafana_lim_mem }}"
-  additionalDataSources:
-    - name: Loki
-      type: loki
-      url: http://loki.{{ monitoring_namespace }}.svc.cluster.local:3100
-      access: proxy
-      isDefault: false
+  enabled: false   # Grafana is deployed as a standalone release in the 'grafana' namespace
 
 prometheus:
   prometheusSpec:
