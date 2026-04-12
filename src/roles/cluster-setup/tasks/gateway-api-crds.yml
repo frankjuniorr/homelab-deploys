@@ -8,8 +8,13 @@
 ##############################################
 - name: "Install Kubernetes Gateway API Standard CRDs ({{ gateway_api_version }})"
   ansible.builtin.command:
-    cmd: "kubectl apply -f {{ gateway_api_crds_url }}"
+    cmd: "kubectl apply -f {{ gateway_api_crds_url }} --validate=false"
   # kubectl apply -f <url> is used here because the manifest bundles 50+ CRD documents.
   # Applying them via kubernetes.core.k8s would create 50+ individual Ansible tasks,
   # making the output unreadable. kubectl handles the bundle natively in one call.
+  # --validate=false skips client-side OpenAPI schema validation, which would otherwise
+  # require kubectl to fetch the schema from the API server over TLS. On a K3s cluster
+  # with a self-signed API server certificate the TLS handshake fails with
+  # "x509: certificate signed by unknown authority". The flag is safe here because
+  # Gateway API CRDs are well-formed upstream manifests.
   changed_when: true
