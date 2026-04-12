@@ -1,5 +1,8 @@
 grafana:
   enabled: false   # Grafana is deployed as a standalone release in the 'grafana' namespace
+  forceDeployDashboards: true   # still create dashboard ConfigMaps in the 'prometheus' namespace
+  defaultDashboardsAnnotations:
+    grafana_folder: Kubernetes   # sidecar uses this annotation to place them in a folder
 
 prometheus:
   prometheusSpec:

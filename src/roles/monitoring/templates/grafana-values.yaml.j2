@@ -5,7 +5,10 @@ sidecar:
     enabled: true
     label: grafana_dashboard
     labelValue: "1"
-    searchNamespace: grafana
+    searchNamespace: ALL        # scan every namespace — picks up ConfigMaps from 'prometheus' too
+    folderAnnotation: grafana_folder   # annotation that defines which folder the dashboard goes into
+    provider:
+      allowUiUpdates: false
 
 resources:
   requests:
