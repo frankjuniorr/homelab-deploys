@@ -101,6 +101,16 @@
   loop_control:
     label: "{{ item }}"
 
+- name: "Apply Grafana dashboard ConfigMaps (Loki log monitoring)"
+  kubernetes.core.k8s:
+    state: present
+    src: "{{ role_path }}/files/{{ item }}"
+  loop:
+    - grafana-dashboard-cluster-logs.yaml
+    - grafana-dashboard-pod-logs.yaml
+  loop_control:
+    label: "{{ item }}"
+
 - name: "Apply monitoring HTTPRoutes (Grafana + Prometheus)"
   kubernetes.core.k8s:
     state: present

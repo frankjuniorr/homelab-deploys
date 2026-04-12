@@ -1,5 +1,12 @@
 adminPassword: "{{ grafana_admin_password }}"
 
+sidecar:
+  dashboards:
+    enabled: true
+    label: grafana_dashboard
+    labelValue: "1"
+    searchNamespace: grafana
+
 resources:
   requests:
     cpu: "{{ grafana_req_cpu }}"

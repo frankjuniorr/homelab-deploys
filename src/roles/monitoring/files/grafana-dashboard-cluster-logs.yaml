@@ -1,0 +1,163 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: grafana-dashboard-cluster-logs
+  namespace: grafana
+  labels:
+    grafana_dashboard: "1"
+data:
+  cluster-logs.json: |
+    {
+      "annotations": { "list": [] },
+      "description": "Cluster-wide log monitoring via Loki — volume, error/warning rate and recent logs",
+      "editable": true,
+      "graphTooltip": 0,
+      "links": [],
+      "panels": [
+        {
+          "datasource": { "type": "loki", "uid": "${datasource}" },
+          "fieldConfig": {
+            "defaults": { "custom": { "lineWidth": 1 } },
+            "overrides": []
+          },
+          "gridPos": { "h": 8, "w": 24, "x": 0, "y": 0 },
+          "id": 1,
+          "options": {
+            "legend": { "calcs": [], "displayMode": "list", "placement": "bottom" },
+            "tooltip": { "mode": "multi" }
+          },
+          "targets": [
+            {
+              "datasource": { "type": "loki", "uid": "${datasource}" },
+              "expr": "sum by(namespace) (rate({namespace=~\"$namespace\"}[$__interval]))",
+              "legendFormat": "{{namespace}}",
+              "refId": "A"
+            }
+          ],
+          "title": "Log Rate by Namespace",
+          "type": "timeseries"
+        },
+        {
+          "datasource": { "type": "loki", "uid": "${datasource}" },
+          "fieldConfig": {
+            "defaults": {
+              "color": { "fixedColor": "red", "mode": "fixed" },
+              "unit": "reqps"
+            },
+            "overrides": []
+          },
+          "gridPos": { "h": 4, "w": 6, "x": 0, "y": 8 },
+          "id": 2,
+          "options": {
+            "colorMode": "background",
+            "graphMode": "none",
+            "justifyMode": "center",
+            "orientation": "auto",
+            "reduceOptions": { "calcs": ["lastNotNull"], "fields": "", "values": false },
+            "textMode": "auto"
+          },
+          "targets": [
+            {
+              "datasource": { "type": "loki", "uid": "${datasource}" },
+              "expr": "sum(rate({namespace=~\"$namespace\"} |~ \"(?i)(error|exception)\"[$__interval]))",
+              "refId": "A"
+            }
+          ],
+          "title": "Error Rate",
+          "type": "stat"
+        },
+        {
+          "datasource": { "type": "loki", "uid": "${datasource}" },
+          "fieldConfig": {
+            "defaults": {
+              "color": { "fixedColor": "orange", "mode": "fixed" },
+              "unit": "reqps"
+            },
+            "overrides": []
+          },
+          "gridPos": { "h": 4, "w": 6, "x": 6, "y": 8 },
+          "id": 3,
+          "options": {
+            "colorMode": "background",
+            "graphMode": "none",
+            "justifyMode": "center",
+            "orientation": "auto",
+            "reduceOptions": { "calcs": ["lastNotNull"], "fields": "", "values": false },
+            "textMode": "auto"
+          },
+          "targets": [
+            {
+              "datasource": { "type": "loki", "uid": "${datasource}" },
+              "expr": "sum(rate({namespace=~\"$namespace\"} |~ \"(?i)warn\"[$__interval]))",
+              "refId": "A"
+            }
+          ],
+          "title": "Warning Rate",
+          "type": "stat"
+        },
+        {
+          "datasource": { "type": "loki", "uid": "${datasource}" },
+          "gridPos": { "h": 16, "w": 24, "x": 0, "y": 12 },
+          "id": 4,
+          "options": {
+            "dedupStrategy": "none",
+            "enableLogDetails": true,
+            "prettifyLogMessage": false,
+            "showCommonLabels": false,
+            "showLabels": false,
+            "showTime": true,
+            "sortOrder": "Descending",
+            "wrapLogMessage": true
+          },
+          "targets": [
+            {
+              "datasource": { "type": "loki", "uid": "${datasource}" },
+              "expr": "{namespace=~\"$namespace\"}",
+              "refId": "A"
+            }
+          ],
+          "title": "Recent Logs",
+          "type": "logs"
+        }
+      ],
+      "refresh": "30s",
+      "schemaVersion": 38,
+      "tags": ["loki", "logs", "homelab"],
+      "templating": {
+        "list": [
+          {
+            "current": {},
+            "hide": 0,
+            "includeAll": false,
+            "label": "Loki Datasource",
+            "multi": false,
+            "name": "datasource",
+            "options": [],
+            "query": "loki",
+            "refresh": 1,
+            "type": "datasource"
+          },
+          {
+            "allValue": ".+",
+            "current": {},
+            "datasource": { "type": "loki", "uid": "${datasource}" },
+            "hide": 0,
+            "includeAll": true,
+            "label": "Namespace",
+            "multi": true,
+            "name": "namespace",
+            "options": [],
+            "query": { "label": "namespace", "stream": "", "type": 1 },
+            "refresh": 2,
+            "sort": 1,
+            "type": "query"
+          }
+        ]
+      },
+      "time": { "from": "now-1h", "to": "now" },
+      "timepicker": {},
+      "timezone": "browser",
+      "title": "Cluster Logs",
+      "uid": "homelab-cluster-logs",
+      "version": 1
+    }
