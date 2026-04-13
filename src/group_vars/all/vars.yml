@@ -28,7 +28,7 @@ kube_prometheus_stack_version: "69.7.4"
 longhorn_version: "1.7.2"
 loki_version: "6.7.4"
 promtail_version: "6.16.6"
-grafana_version: "8.10.4"
+grafana_version: "8.15.0"
 node_exporter_version: "1.9.1"
 
 ##############################################################
