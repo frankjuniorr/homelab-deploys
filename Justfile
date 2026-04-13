@@ -43,6 +43,11 @@ deploy-apps:
 install-ca:
     @cd src && {{ansible_cmd}} main.yaml --tags "ca-trust"
 
+# Remove todos os namespaces criados pelo homelab-deploys, zerando o cluster
+# ATENÇÃO: irreversível — requer `just deploy` para restaurar
+destroy:
+    @cd src && {{ansible_cmd}} destroy.yaml
+
 ############################################################################
 # SECRETS (Ansible-Vault)
 ############################################################################
