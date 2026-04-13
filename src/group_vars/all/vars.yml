@@ -29,6 +29,7 @@ longhorn_version: "1.7.2"
 loki_version: "6.7.4"
 promtail_version: "6.16.6"
 grafana_version: "8.10.4"
+node_exporter_version: "1.9.1"
 
 ##############################################################
 # Domains
@@ -72,6 +73,11 @@ longhorn_backup_credential_secret: longhorn-backup-secret
 longhorn_s3_endpoint: "http://192.168.1.52:3900"
 longhorn_backup_access_key: "{{ vault_longhorn_backup_access_key }}"
 longhorn_backup_secret_key: "{{ vault_longhorn_backup_secret_key }}"
+
+##############################################################
+# Proxmox Host Monitoring
+##############################################################
+proxmox_host_ip: "192.168.1.115"
 
 ##############################################################
 # Monitoring (kube-prometheus-stack)

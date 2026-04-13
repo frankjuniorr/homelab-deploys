@@ -1,18 +1,15 @@
 ---
 ##############################################
 # MONITORING ROLE
-# Deploys the full observability stack across dedicated namespaces:
+# Deploys the Prometheus and Loki observability stacks:
 #   - kube-prometheus-stack: Prometheus + Alertmanager + kube-state-metrics + node-exporter (ns: prometheus)
-#   - Grafana:               Standalone dashboards + datasources (ns: grafana)
 #   - Loki:                  Log aggregation (single binary mode) (ns: loki)
 #   - Promtail:              DaemonSet log collector — ships pod logs to Loki (ns: loki)
 #
-# Grafana     → grafana.frank.lab.io     (service: grafana:80)
 # Prometheus  → prometheus.frank.lab.io  (service: kube-prometheus-stack-prometheus:9090)
 # Loki        → internal only            (service: loki:3100)
 #
-# Grafana admin password: vault_grafana_admin_password (vault.yml) — add via: just secrets-edit
-# Loki datasource is pre-configured in Grafana via grafana-values.yaml.j2
+# Grafana is managed by the dedicated 'grafana' role.
 ##############################################
 
 - name: "Add Helm repos (prometheus-community + grafana)"
@@ -20,7 +17,7 @@
     cmd: "helm repo add {{ item.name }} {{ item.url }} --force-update"
   loop:
     - { name: prometheus-community, url: "https://prometheus-community.github.io/helm-charts" }
-    - { name: grafana, url: "https://grafana.github.io/helm-charts" }
+    - { name: grafana,              url: "https://grafana.github.io/helm-charts" }
   loop_control:
     label: "{{ item.name }}"
   changed_when: false
@@ -38,7 +35,6 @@
   loop:
     - { src: kube-prometheus-stack-values.yaml.j2, dest: /tmp/kube-prometheus-stack-values.yaml }
     - { src: loki-values.yaml.j2,                  dest: /tmp/loki-values.yaml }
-    - { src: grafana-values.yaml.j2,               dest: /tmp/grafana-values.yaml }
   loop_control:
     label: "{{ item.src }}"
 
@@ -53,18 +49,6 @@
       --values /tmp/kube-prometheus-stack-values.yaml
   register: helm_kps
   changed_when: "'has been upgraded' in helm_kps.stdout or 'has been installed' in helm_kps.stdout"
-
-- name: "Install Grafana (standalone — dashboards + datasources)"
-  ansible.builtin.command:
-    cmd: >
-      helm upgrade --install grafana grafana/grafana
-      --namespace {{ namespace_grafana }}
-      --create-namespace
-      --version {{ grafana_version }}
-      --wait
-      --values /tmp/grafana-values.yaml
-  register: helm_grafana
-  changed_when: "'has been upgraded' in helm_grafana.stdout or 'has been installed' in helm_grafana.stdout"
 
 - name: "Install Loki (log aggregation, single binary + filesystem storage)"
   ansible.builtin.command:
@@ -97,26 +81,10 @@
   loop:
     - /tmp/kube-prometheus-stack-values.yaml
     - /tmp/loki-values.yaml
-    - /tmp/grafana-values.yaml
   loop_control:
     label: "{{ item }}"
 
-- name: "Apply Grafana dashboard ConfigMaps (Loki log monitoring)"
+- name: "Apply Prometheus HTTPRoute"
   kubernetes.core.k8s:
     state: present
-    src: "{{ role_path }}/files/{{ item }}"
-  loop:
-    - grafana-dashboard-cluster-logs.yaml
-    - grafana-dashboard-pod-logs.yaml
-  loop_control:
-    label: "{{ item }}"
-
-- name: "Apply monitoring HTTPRoutes (Grafana + Prometheus)"
-  kubernetes.core.k8s:
-    state: present
-    definition: "{{ lookup('template', role_path + '/templates/' + item.file) | from_yaml }}"
-  loop:
-    - file: grafana-httproute.yaml.j2
-    - file: prometheus-httproute.yaml.j2
-  loop_control:
-    label: "{{ item.file }}"
+    definition: "{{ lookup('template', role_path + '/templates/prometheus-httproute.yaml.j2') | from_yaml }}"

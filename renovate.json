@@ -81,6 +81,14 @@
       "datasourceTemplate": "helm",
       "depNameTemplate": "grafana",
       "registryUrlTemplate": "https://grafana.github.io/helm-charts"
+    },
+    {
+      "description": "Prometheus node_exporter binary version (GitHub release)",
+      "customType": "regex",
+      "fileMatch": ["^src/group_vars/all/vars\\.yml$"],
+      "matchStrings": ["node_exporter_version:\\s*\"(?<currentValue>[\\d.]+)\""],
+      "datasourceTemplate": "github-releases",
+      "depNameTemplate": "prometheus/node_exporter"
     }
   ]
 }

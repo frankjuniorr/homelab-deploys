@@ -21,6 +21,25 @@
         - infra
 
 ##############################################
+# Proxmox Host Monitoring
+# Installs node_exporter + VM/LXC metrics script on the Proxmox host via SSH.
+# Also applies the Grafana dashboard ConfigMap to the K3s cluster (delegate_to: localhost).
+##############################################
+- name: "Install node_exporter on Proxmox host"
+  hosts: proxmox_node
+  gather_facts: false
+  become: true
+  tags:
+    - setup
+    - proxmox-node
+
+  roles:
+    - role: proxmox-node
+      tags:
+        - setup
+        - proxmox-node
+
+##############################################
 # Applications
 # Each application is its own role. Role name = namespace name (convention).
 # Add new apps by creating a new role under src/roles/<app-name>/ and listing it here.
@@ -46,6 +65,12 @@
         - setup
         - apps
         - monitoring
+
+    - role: grafana
+      tags:
+        - setup
+        - apps
+        - grafana
 
     - role: longhorn
       tags:

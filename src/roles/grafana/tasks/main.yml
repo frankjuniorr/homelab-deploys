@@ -1,0 +1,68 @@
+---
+##############################################
+# GRAFANA ROLE
+# Installs standalone Grafana and applies all custom dashboard ConfigMaps.
+# Grafana → grafana.frank.lab.io (service: grafana:80)
+#
+# Admin password: vault_grafana_admin_password (vault.yml) — add via: just secrets-edit
+# Datasources pre-configured in grafana-values.yaml.j2 (Prometheus + Loki)
+##############################################
+
+- name: "Add Helm repo (grafana)"
+  ansible.builtin.command:
+    cmd: helm repo add grafana https://grafana.github.io/helm-charts --force-update
+  changed_when: false
+
+- name: "Update Helm repo cache"
+  ansible.builtin.command:
+    cmd: helm repo update
+  changed_when: false
+
+- name: "Write Grafana Helm values to temp file"
+  ansible.builtin.template:
+    src: grafana-values.yaml.j2
+    dest: /tmp/grafana-values.yaml
+    mode: "0600"
+
+- name: "Install Grafana (standalone — dashboards + datasources)"
+  ansible.builtin.command:
+    cmd: >
+      helm upgrade --install grafana grafana/grafana
+      --namespace {{ namespace_grafana }}
+      --create-namespace
+      --version {{ grafana_version }}
+      --wait
+      --values /tmp/grafana-values.yaml
+  register: helm_grafana
+  changed_when: "'has been upgraded' in helm_grafana.stdout or 'has been installed' in helm_grafana.stdout"
+
+- name: "Remove temporary Grafana Helm values file"
+  ansible.builtin.file:
+    path: /tmp/grafana-values.yaml
+    state: absent
+
+- name: "Apply Grafana dashboard ConfigMaps"
+  kubernetes.core.k8s:
+    state: present
+    definition:
+      apiVersion: v1
+      kind: ConfigMap
+      metadata:
+        name: "grafana-dashboard-{{ item.name }}"
+        namespace: "{{ namespace_grafana }}"
+        labels:
+          grafana_dashboard: "1"
+        annotations:
+          grafana_folder: "{{ item.folder }}"
+      data: "{{ {item.name + '.json': lookup('file', role_path + '/files/dashboards/' + item.name + '.json')} }}"
+  loop:
+    - { name: cluster-logs,  folder: Loki }
+    - { name: pod-logs,      folder: Loki }
+    - { name: proxmox-node,  folder: Proxmox }
+  loop_control:
+    label: "{{ item.name }}"
+
+- name: "Apply Grafana HTTPRoute"
+  kubernetes.core.k8s:
+    state: present
+    definition: "{{ lookup('template', role_path + '/templates/grafana-httproute.yaml.j2') | from_yaml }}"

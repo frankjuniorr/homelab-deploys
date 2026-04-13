@@ -7,6 +7,13 @@ grafana:
 prometheus:
   prometheusSpec:
     retention: "{{ prometheus_retention }}"
+    additionalScrapeConfigs:
+      - job_name: proxmox-node
+        static_configs:
+          - targets:
+              - "{{ proxmox_host_ip }}:9100"
+            labels:
+              node: proxmox
     resources:
       requests:
         cpu: "{{ prometheus_req_cpu }}"

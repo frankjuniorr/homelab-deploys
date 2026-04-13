@@ -48,7 +48,7 @@ Justfile → Ansible playbooks (src/) → kubernetes.core modules → K3s cluste
 
 - **`src/main.yaml`** — Primary deployment playbook; uses tags to target subsets
 - **`src/hosts.yaml`** — Ansible inventory (`localhost` with `connection: local`)
-- **`src/roles/`** — Two self-contained roles; each owns its Kubernetes manifests in `files/`
+- **`src/roles/`** — Self-contained roles; each owns its Kubernetes manifests in `files/`
 - **`src/group_vars/all.yml`** — Global variables (namespaces, versions, domain, cert names)
 
 ### Technology Stack
@@ -90,13 +90,28 @@ src/
     │       ├── cert-manager-issuer.yaml  # self-signed Issuer + Root CA + ClusterIssuer
     │       ├── certificate.yaml          # Wildcard cert for *.frank.lab.io (namespace: gateway)
     │       └── gateway-api-instance.yaml # Gateway HTTP + HTTPS listeners (namespace: gateway)
-    └── podinfo/                     # Demo application (role name = namespace name)
-        ├── tasks/main.yml           # Single loop: namespace.yaml + all app resources
-        └── files/                   # Application manifests (namespace: podinfo)
-            ├── namespace.yaml       # 'podinfo' namespace — first item in the deploy loop
-            ├── deployment.yaml      # podinfo Deployment
-            ├── service.yaml         # podinfo ClusterIP Service
-            └── httproute.yaml       # HTTPRoute: hello.frank.lab.io → my-gateway (gateway ns)
+    ├── podinfo/                     # Demo application (role name = namespace name)
+    │   ├── tasks/main.yml           # Single loop: namespace.yaml + all app resources
+    │   └── files/                   # Application manifests (namespace: podinfo)
+    │       ├── namespace.yaml       # 'podinfo' namespace — first item in the deploy loop
+    │       ├── deployment.yaml      # podinfo Deployment
+    │       ├── service.yaml         # podinfo ClusterIP Service
+    │       └── httproute.yaml       # HTTPRoute: hello.frank.lab.io → my-gateway (gateway ns)
+    ├── monitoring/                  # Prometheus + Loki + Promtail (ns: prometheus, loki)
+    │   ├── tasks/main.yml
+    │   └── templates/
+    │       ├── kube-prometheus-stack-values.yaml.j2
+    │       ├── loki-values.yaml.j2
+    │       └── prometheus-httproute.yaml.j2
+    └── grafana/                     # Grafana standalone + all dashboard ConfigMaps (ns: grafana)
+        ├── tasks/main.yml           # Helm install + dashboard ConfigMaps + HTTPRoute
+        ├── templates/
+        │   ├── grafana-values.yaml.j2
+        │   └── grafana-httproute.yaml.j2
+        └── files/dashboards/        # Dashboard JSON files (plain .json, ConfigMaps built inline)
+            ├── cluster-logs.json
+            ├── pod-logs.json
+            └── proxmox-node.json
 ```
 
 ### Tags for granular runs
@@ -106,6 +121,9 @@ src/
 | `infra` | `cluster-setup` role only (no apps) |
 | `apps` | All app roles |
 | `podinfo` | `podinfo` role only |
+| `monitoring` | `monitoring` role only (Prometheus + Loki + Promtail) |
+| `grafana` | `grafana` role only (Grafana install + all dashboards) |
+| `proxmox-node` | node_exporter install on Proxmox host only |
 | `ca-trust` | Root CA OS/browser trust tasks only (subset of `cluster-setup`) |
 
 ### Certificate Trust Flow
@@ -156,7 +174,16 @@ No resources are placed in the `default` namespace. Each concern has its own nam
 | `prometheus` | kube-prometheus-stack (Prometheus + Alertmanager + kube-state-metrics + node-exporter) |
 | `grafana` | Grafana standalone (dashboards + datasources for Prometheus and Loki) |
 | `loki` | Loki (log aggregation) + Promtail (log collector DaemonSet) |
+| `longhorn-system` | Longhorn distributed block storage (created by Helm) |
 | `<app-name>` | any future application role |
+
+## Proxmox Host Monitoring
+
+`node_exporter` runs as a systemd service directly on the Proxmox host (`192.168.1.115`). A companion bash script (`proxmox-vm-metrics.sh`) runs every 30 seconds via a systemd timer and writes per-VM/LXC metrics in Prometheus textfile format to `/var/lib/node_exporter/textfile/proxmox_guests.prom`. Prometheus scrapes `:9100` with `job_name: proxmox-node`.
+
+- Role: `src/roles/proxmox-node/` — manages binary install, systemd units
+- The Proxmox dashboard (`proxmox-node.json`) lives in the `grafana` role (`files/dashboards/`) and is applied there
+- Destroy: `just destroy` stops/removes node_exporter from the host before wiping cluster namespaces
 
 ## Key Domain
 Internal services are exposed under `*.frank.lab.io` via the Gateway (`gateway` namespace) with a wildcard TLS listener. The Gateway IP is assigned from MetalLB's pool (`192.168.1.200–192.168.1.205`) and displayed at the end of the `cluster-setup` role.

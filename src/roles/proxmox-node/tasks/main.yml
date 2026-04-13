@@ -1,0 +1,185 @@
+---
+##############################################
+# PROXMOX-NODE ROLE
+# Installs Prometheus node_exporter as a systemd service on the Proxmox host.
+# Also installs a textfile collector script that scrapes per-VM/LXC resource
+# metrics via pvesh CLI and writes them to /var/lib/node_exporter/textfile/,
+# making them available to Prometheus via the node_exporter :9100 endpoint.
+#
+# Idempotency: checks installed version before re-downloading the binary.
+# Delegates the Grafana dashboard ConfigMap task back to localhost (K3s cluster).
+##############################################
+
+# ── Dependencies ───────────────────────────────────────────────────────────
+
+- name: "Install jq (required by proxmox-vm-metrics.sh)"
+  ansible.builtin.apt:
+    name: jq
+    state: present
+    update_cache: false
+
+# ── Version check ──────────────────────────────────────────────────────────
+
+- name: "Check currently installed node_exporter version"
+  ansible.builtin.shell:
+    cmd: "/usr/local/bin/node_exporter --version 2>&1 | awk '/node_exporter, version/{print $3}'"
+  register: ne_installed
+  changed_when: false
+  failed_when: false
+
+- name: "Set installed node_exporter version fact"
+  ansible.builtin.set_fact:
+    ne_current: "{{ ne_installed.stdout | trim }}"
+
+# ── Download and install binary ─────────────────────────────────────────────
+
+- name: "Download node_exporter {{ node_exporter_version }} archive"
+  ansible.builtin.get_url:
+    url: "https://github.com/prometheus/node_exporter/releases/download/v{{ node_exporter_version }}/node_exporter-{{ node_exporter_version }}.linux-amd64.tar.gz"
+    dest: "/tmp/node_exporter-{{ node_exporter_version }}.tar.gz"
+    mode: "0644"
+  when: ne_current != node_exporter_version
+
+- name: "Extract node_exporter archive"
+  ansible.builtin.unarchive:
+    src: "/tmp/node_exporter-{{ node_exporter_version }}.tar.gz"
+    dest: /tmp/
+    remote_src: true
+  when: ne_current != node_exporter_version
+
+- name: "Install node_exporter binary to /usr/local/bin"
+  ansible.builtin.copy:
+    src: "/tmp/node_exporter-{{ node_exporter_version }}.linux-amd64/node_exporter"
+    dest: /usr/local/bin/node_exporter
+    owner: root
+    group: root
+    mode: "0755"
+    remote_src: true
+  when: ne_current != node_exporter_version
+  notify: "Restart node_exporter"
+
+- name: "Remove node_exporter temp files"
+  ansible.builtin.file:
+    path: "{{ item }}"
+    state: absent
+  loop:
+    - "/tmp/node_exporter-{{ node_exporter_version }}.tar.gz"
+    - "/tmp/node_exporter-{{ node_exporter_version }}.linux-amd64"
+  when: ne_current != node_exporter_version
+  loop_control:
+    label: "{{ item }}"
+
+# ── System user + textfile directory ───────────────────────────────────────
+
+- name: "Create node_exporter system user"
+  ansible.builtin.user:
+    name: node_exporter
+    system: true
+    shell: /usr/sbin/nologin
+    create_home: false
+    comment: "Prometheus Node Exporter"
+    state: present
+
+- name: "Create textfile collector directory"
+  ansible.builtin.file:
+    path: /var/lib/node_exporter/textfile
+    state: directory
+    owner: root
+    group: root
+    mode: "0755"
+
+# ── VM/LXC metrics script + systemd timer ──────────────────────────────────
+
+- name: "Install proxmox-vm-metrics collection script"
+  ansible.builtin.copy:
+    src: proxmox-vm-metrics.sh
+    dest: /usr/local/bin/proxmox-vm-metrics.sh
+    owner: root
+    group: root
+    mode: "0755"
+  notify: "Restart proxmox-vm-metrics timer"
+
+- name: "Install proxmox-vm-metrics systemd service unit"
+  ansible.builtin.copy:
+    dest: /etc/systemd/system/proxmox-vm-metrics.service
+    owner: root
+    group: root
+    mode: "0644"
+    content: |
+      [Unit]
+      Description=Collect Proxmox VM/LXC metrics for node_exporter textfile collector
+      After=network.target
+
+      [Service]
+      Type=oneshot
+      ExecStart=/usr/local/bin/proxmox-vm-metrics.sh
+      User=root
+  notify: "Reload systemd"
+
+- name: "Install proxmox-vm-metrics systemd timer unit"
+  ansible.builtin.copy:
+    dest: /etc/systemd/system/proxmox-vm-metrics.timer
+    owner: root
+    group: root
+    mode: "0644"
+    content: |
+      [Unit]
+      Description=Run Proxmox VM/LXC metrics collection every 30 seconds
+
+      [Timer]
+      OnBootSec=10s
+      OnUnitActiveSec=30s
+
+      [Install]
+      WantedBy=timers.target
+  notify: "Reload systemd"
+
+- name: "Enable and start proxmox-vm-metrics timer"
+  ansible.builtin.systemd:
+    name: proxmox-vm-metrics.timer
+    enabled: true
+    state: started
+    daemon_reload: false
+
+# ── node_exporter systemd unit ─────────────────────────────────────────────
+
+- name: "Install node_exporter systemd unit file"
+  ansible.builtin.copy:
+    dest: /etc/systemd/system/node_exporter.service
+    owner: root
+    group: root
+    mode: "0644"
+    content: |
+      [Unit]
+      Description=Prometheus Node Exporter
+      After=network.target
+
+      [Service]
+      User=node_exporter
+      ExecStart=/usr/local/bin/node_exporter \
+        --collector.textfile.directory=/var/lib/node_exporter/textfile
+      Restart=on-failure
+
+      [Install]
+      WantedBy=multi-user.target
+  notify: "Reload systemd and restart node_exporter"
+
+- name: "Enable and start node_exporter service"
+  ansible.builtin.systemd:
+    name: node_exporter
+    enabled: true
+    state: started
+    daemon_reload: false
+
+# ── Firewall ────────────────────────────────────────────────────────────────
+
+- name: "Allow port 9100/tcp in iptables (best-effort — Proxmox may use nftables)"
+  ansible.builtin.iptables:
+    chain: INPUT
+    protocol: tcp
+    destination_port: "9100"
+    jump: ACCEPT
+    comment: "node_exporter metrics"
+    state: present
+  failed_when: false
+

@@ -6,36 +6,23 @@
   <img src="https://img.shields.io/badge/Ansible-black.svg?style=for-the-badge&logo=ansible&logoColor=white" alt="Ansible"/>
 </p>
 
-## Overview
-
-The **Homelab Deploys** project is responsible for managing the software layer and workloads running on the personal Kubernetes (K3s) cluster. While the [`homelab-iac`](../homelab-iac/) repository handles the raw infrastructure (VMs and Proxmox), this project focuses on orchestrating networking services, security components, and applications.
-
-It uses **Ansible** as the orchestration layer, driving Helm chart deployments and Kubernetes manifest applications through the `kubernetes.core` collection.
-
----
-
-## What is it for?
-
-This project automates the configuration of critical components for daily homelab operations:
-
-- **Network LoadBalancer (MetalLB):** Provides real IP addresses from your local network to cluster services.
-- **Ingress & Gateway (Envoy Gateway):** Implements the Kubernetes **Gateway API**, managing external traffic into your applications.
-- **TLS Management (cert-manager):** Creates a dedicated internal Certificate Authority (CA). This allows all internal services to use HTTPS (`https://service.frank.lab.io`) with valid, trusted certificates.
-- **Trust Automation:** Includes logic to automatically inject the Root CA certificate into your operating system (Linux) and browsers (Chrome/Firefox), eliminating "insecure connection" warnings.
+The **software/workload layer** of a personal K3s homelab. While [`homelab-iac`](../homelab-iac/) provisions the raw infrastructure (Proxmox VMs, K3s cluster), this repo configures everything that runs on top of it: networking, TLS, observability, storage, and applications — all driven by Ansible.
 
 ---
 
 ## Core Components
 
-| Component | Function |
-| :--- | :--- |
-| **MetalLB** | Layer 2 LoadBalancer for assigning local network IPs (e.g., `192.168.1.200`). |
-| **Envoy Gateway** | Gateway API implementation for traffic routing and TLS termination. |
-| **cert-manager** | Automatic TLS certificate issuance via Self-Signed ClusterIssuer (ECDSA-256). |
-| **Prometheus** | Metrics collection via kube-prometheus-stack (namespace: `prometheus`). |
-| **Grafana** | Standalone dashboards with Prometheus + Loki datasources (namespace: `grafana`). |
-| **Loki + Promtail** | Log aggregation and collection (namespace: `loki`). |
-| **Podinfo** | Demo application used to validate the entire stack's functionality. |
+| Component | Namespace | Description |
+| :--- | :--- | :--- |
+| **MetalLB** | `metallb-system` | Layer 2 LoadBalancer — assigns real LAN IPs (`192.168.1.200–205`) to services |
+| **Envoy Gateway** | `envoy-gateway-system` | Gateway API implementation — routes external traffic and terminates TLS |
+| **cert-manager** | `cert-manager` | Internal CA with auto-issued wildcard cert for `*.frank.lab.io` (ECDSA-256) |
+| **Prometheus** | `prometheus` | kube-prometheus-stack — metrics, alerting, kube-state-metrics, node-exporter |
+| **Grafana** | `grafana` | Standalone dashboards with Prometheus + Loki datasources |
+| **Loki + Promtail** | `loki` | Log aggregation and pod log collection |
+| **Longhorn** | `longhorn-system` | Distributed block storage for persistent volumes |
+| **node_exporter** | host | Systemd service on the Proxmox host; exposes host + per-VM/LXC metrics on `:9100` |
+| **Podinfo** | `podinfo` | Demo app — validates the full stack end-to-end |
 
 ---
 
@@ -43,43 +30,37 @@ This project automates the configuration of critical components for daily homela
 
 ### Prerequisites
 
-- A functional Kubernetes cluster (installed via `homelab-iac`).
-- `kubectl`, `helm`, `ansible`, `python3`/`pip3`, and `openssl` available in PATH.
-- `pip3 install kubernetes watchdog` (required by `kubernetes.core` and the output plugin).
+- A running K3s cluster provisioned via `homelab-iac`
+- `kubectl`, `helm`, `ansible`, `python3`/`pip3`, `openssl` in PATH
+- Python dependencies: `pip3 install kubernetes watchdog`
 
 ### First-time Setup
 
 ```bash
-# Generate vault password (stored at ~/.config/homelab-iac/.vault_pass)
-just secrets-keygen
-
-# Install git hooks + Ansible Galaxy collections + check dependencies
-just init
+just secrets-keygen   # Generate vault password at ~/.config/homelab-iac/.vault_pass
+just init             # Install hooks + Ansible Galaxy collections + check dependencies
 ```
 
 ### Deployment
 
 ```bash
-# Full deploy: cluster infra + apps + Root CA trust
-just deploy
-
-# Deploy only cluster infrastructure (MetalLB, Envoy Gateway, cert-manager, PKI)
-just deploy-infra
-
-# Deploy only applications
-just deploy-apps
-
-# Re-install Root CA into OS trust store and browsers (useful on a new machine)
-just install-ca
+just deploy           # Full deploy: infra + apps + Root CA trust + Proxmox node_exporter
+just deploy-infra     # Cluster infra only (MetalLB, Envoy Gateway, cert-manager, PKI)
+just deploy-apps      # Applications only
+just install-ca       # Re-install Root CA into OS trust store and browsers
+just destroy          # Wipe all cluster namespaces + remove node_exporter from Proxmox host
 ```
+
+> [!TIP]
+> Run `just plugin off` before deploying when you need to debug Ansible task output — the default pretty-printer can swallow error details.
 
 ### Secrets
 
 ```bash
-just secrets-edit      # Decrypt → edit → re-encrypt vault.yml (recommended)
-just secrets-view      # View decrypted vault.yml in terminal
-just secrets-encrypt   # Manually encrypt vault.yml before committing
-just secrets-decrypt   # Permanently decrypt vault.yml (use with caution)
+just secrets-edit     # Decrypt → edit → re-encrypt vault.yml (recommended)
+just secrets-view     # View decrypted vault.yml in terminal
+just secrets-encrypt  # Manually encrypt vault.yml before committing
+just secrets-decrypt  # Permanently decrypt vault.yml (use with caution)
 ```
 
 ---
@@ -88,20 +69,69 @@ just secrets-decrypt   # Permanently decrypt vault.yml (use with caution)
 
 ```
 src/
-├── main.yaml                  # Primary Ansible playbook (2 plays)
-├── ansible.cfg                # Ansible config (beautiful_output callback)
-├── hosts.yaml                 # Inventory: localhost (connection: local)
-├── requirements.yml           # Galaxy collection: kubernetes.core
-├── group_vars/
-│   └── all/
-│       ├── vars.yml           # Global variables (namespaces, versions, domain)
-│       └── vault.yml          # Encrypted secrets (Ansible Vault)
+├── main.yaml                        # Primary Ansible playbook
+├── ansible.cfg                      # Ansible config (beautiful_output callback)
+├── hosts.yaml                       # Inventory: localhost + proxmox_node
+├── requirements.yml                 # Galaxy collection: kubernetes.core
+├── group_vars/all/
+│   ├── vars.yml                     # Namespaces, versions, domains, resource limits
+│   └── vault.yml                    # Encrypted secrets (Ansible Vault)
 ├── callback_plugins/
-│   └── beautiful_output.py    # Aesthetic output plugin
+│   └── beautiful_output.py          # Aesthetic output plugin
 └── roles/
-    ├── cluster-setup/         # Full cluster bootstrap (infra + networking + TLS + CA trust)
-    └── podinfo/               # Demo application
+    ├── cluster-setup/               # Bootstrap: Gateway API CRDs → Helm charts → PKI → CA trust
+    ├── podinfo/                     # Demo app (Deployment + Service + HTTPRoute)
+    ├── monitoring/                  # Prometheus + Loki + Promtail (Helm)
+    ├── grafana/                     # Grafana Helm install + all dashboard ConfigMaps
+    │   └── files/dashboards/        # Dashboard definitions as plain .json files
+    │       ├── cluster-logs.json    # Cluster-wide log monitoring (Loki)
+    │       ├── pod-logs.json        # Per-pod log explorer (Loki)
+    │       └── proxmox-node.json    # Proxmox host + VM/LXC metrics (Prometheus)
+    ├── proxmox-node/                # node_exporter + VM/LXC metrics script on Proxmox host
+    └── longhorn/                    # Distributed block storage (Helm)
 ```
+
+### Tags for Granular Runs
+
+```bash
+ansible-playbook src/main.yaml --tags <tag>
+```
+
+| Tag | Scope |
+| :--- | :--- |
+| `setup` | Everything (full deploy) |
+| `infra` | `cluster-setup` role only |
+| `apps` | All application roles |
+| `monitoring` | Prometheus + Loki + Promtail only |
+| `grafana` | Grafana install + all dashboards only |
+| `podinfo` | podinfo role only |
+| `longhorn` | Longhorn role only |
+| `proxmox-node` | node_exporter on Proxmox host only |
+| `ca-trust` | Root CA OS/browser trust tasks only |
+
+---
+
+## Grafana Dashboards
+
+All custom dashboards live as plain `.json` files under `src/roles/grafana/files/dashboards/`. Ansible creates the ConfigMaps inline — no YAML wrapper files. To add a new dashboard:
+
+1. Drop a `my-dashboard.json` into `src/roles/grafana/files/dashboards/`
+2. Add an entry to the loop in `src/roles/grafana/tasks/main.yml`:
+   ```yaml
+   - { name: my-dashboard, folder: MyFolder }
+   ```
+
+---
+
+## Certificate Trust
+
+`cert-manager` generates a self-signed Root CA and a wildcard cert for `*.frank.lab.io`. The `cluster-setup` role extracts the CA and installs it locally:
+
+- **Arch Linux** → `/etc/ca-certificates/trust-source/anchors/` + `update-ca-trust`
+- **Ubuntu/Debian** → `/usr/local/share/ca-certificates/` + `update-ca-certificates`
+- **Chrome/Firefox** → injected into NSS databases via `certutil` (if available)
+
+Run `just install-ca` to re-run only the trust installation on a new machine.
 
 ---
 

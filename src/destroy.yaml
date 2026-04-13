@@ -3,10 +3,61 @@
 # DESTROY
 # Removes all Kubernetes namespaces created by homelab-deploys,
 # effectively wiping all workloads from the cluster.
+# Also removes node_exporter from the Proxmox host.
 #
 # Usage: just destroy
 # WARNING: This is irreversible. Run `just deploy` to restore the full stack.
 ##############################################
+
+- name: "Uninstall node_exporter from Proxmox host"
+  hosts: proxmox_node
+  gather_facts: false
+  become: true
+
+  tasks:
+    - name: "Stop and disable systemd units"
+      ansible.builtin.systemd:
+        name: "{{ item }}"
+        state: stopped
+        enabled: false
+      loop:
+        - proxmox-vm-metrics.timer
+        - node_exporter
+      loop_control:
+        label: "{{ item }}"
+      failed_when: false
+
+    - name: "Remove systemd unit files"
+      ansible.builtin.file:
+        path: "{{ item }}"
+        state: absent
+      loop:
+        - /etc/systemd/system/node_exporter.service
+        - /etc/systemd/system/proxmox-vm-metrics.service
+        - /etc/systemd/system/proxmox-vm-metrics.timer
+      loop_control:
+        label: "{{ item }}"
+
+    - name: "Reload systemd after unit removal"
+      ansible.builtin.systemd:
+        daemon_reload: true
+
+    - name: "Remove binaries and textfile directory"
+      ansible.builtin.file:
+        path: "{{ item }}"
+        state: absent
+      loop:
+        - /usr/local/bin/node_exporter
+        - /usr/local/bin/proxmox-vm-metrics.sh
+        - /var/lib/node_exporter
+      loop_control:
+        label: "{{ item }}"
+
+    - name: "Remove node_exporter system user"
+      ansible.builtin.user:
+        name: node_exporter
+        state: absent
+      failed_when: false
 
 - name: "Delete all cluster namespaces"
   hosts: localhost
