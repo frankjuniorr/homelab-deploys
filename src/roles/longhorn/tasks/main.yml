@@ -54,6 +54,11 @@
     state: present
     definition: "{{ lookup('template', role_path + '/templates/backup-secret.yaml.j2') | from_yaml }}"
 
+- name: "Apply Longhorn daily backup RecurringJob"
+  kubernetes.core.k8s:
+    state: present
+    definition: "{{ lookup('template', role_path + '/templates/recurring-job.yaml.j2') | from_yaml }}"
+
 - name: "Apply Longhorn UI HTTPRoute (longhorn.{{ homelab_domain }})"
   kubernetes.core.k8s:
     state: present

@@ -1,0 +1,12 @@
+apiVersion: longhorn.io/v1beta2
+kind: RecurringJob
+metadata:
+  name: backup-daily
+  namespace: longhorn-system
+spec:
+  name: "{{ longhorn_recurring_job_name }}"
+  cron: "{{ longhorn_recurring_job_cron }}"
+  task: backup
+  retain: 7            # keep 7 daily backups per volume
+  concurrency: 2
+  labels: {}

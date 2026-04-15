@@ -1,363 +1,625 @@
 {
-  "annotations": { "list": [] },
-  "description": "Proxmox host metrics (node_exporter) + per-VM/LXC metrics (textfile collector)",
+  "annotations": {"list": []},
+  "description": "Proxmox host (node_exporter) + K8s nodes RAM real (node-exporter DaemonSet) + Guests (textfile collector). Exibe RAM REAL distinguindo apps de cache — evita a ilusão do console do Proxmox.",
   "editable": true,
   "graphTooltip": 1,
   "links": [],
   "panels": [
+
     {
       "collapsed": false,
-      "gridPos": { "h": 1, "w": 24, "x": 0, "y": 0 },
+      "gridPos": {"h": 1, "w": 24, "x": 0, "y": 0},
       "id": 100,
       "title": "Host — Proxmox Node",
       "type": "row"
     },
+
     {
-      "datasource": { "type": "prometheus", "uid": "prometheus" },
+      "datasource": {"type": "prometheus", "uid": "prometheus"},
       "fieldConfig": {
         "defaults": {
-          "color": { "mode": "thresholds" },
-          "thresholds": { "mode": "percentage", "steps": [
-            { "color": "green", "value": null },
-            { "color": "yellow", "value": 70 },
-            { "color": "red", "value": 90 }
+          "color": {"mode": "thresholds"},
+          "thresholds": {"mode": "percentage", "steps": [
+            {"color": "green", "value": null},
+            {"color": "yellow", "value": 70},
+            {"color": "red", "value": 90}
           ]},
           "unit": "percent", "min": 0, "max": 100
-        }, "overrides": []
+        },
+        "overrides": []
       },
-      "gridPos": { "h": 6, "w": 4, "x": 0, "y": 1 },
+      "gridPos": {"h": 6, "w": 4, "x": 0, "y": 1},
       "id": 1,
-      "options": { "orientation": "auto", "reduceOptions": { "calcs": ["lastNotNull"] }, "showThresholdMarkers": true },
+      "options": {"orientation": "auto", "reduceOptions": {"calcs": ["lastNotNull"]}, "showThresholdMarkers": true},
       "targets": [{
-        "datasource": { "type": "prometheus", "uid": "prometheus" },
+        "datasource": {"type": "prometheus", "uid": "prometheus"},
         "expr": "100 - (avg(rate(node_cpu_seconds_total{job=\"proxmox-node\",mode=\"idle\"}[$__rate_interval])) * 100)",
         "legendFormat": "CPU", "refId": "A"
       }],
       "title": "CPU Usage",
       "type": "gauge"
     },
+
     {
-      "datasource": { "type": "prometheus", "uid": "prometheus" },
+      "datasource": {"type": "prometheus", "uid": "prometheus"},
+      "description": "Pressão REAL de RAM usando MemAvailable (exclui page cache reclaimável). O console do Proxmox soma cache do SO e mostra ~90% — este painel mostra o valor correto.",
       "fieldConfig": {
         "defaults": {
-          "color": { "mode": "thresholds" },
-          "thresholds": { "mode": "percentage", "steps": [
-            { "color": "green", "value": null },
-            { "color": "yellow", "value": 70 },
-            { "color": "red", "value": 90 }
+          "color": {"mode": "thresholds"},
+          "thresholds": {"mode": "percentage", "steps": [
+            {"color": "green", "value": null},
+            {"color": "yellow", "value": 60},
+            {"color": "red", "value": 80}
           ]},
           "unit": "percent", "min": 0, "max": 100
-        }, "overrides": []
+        },
+        "overrides": []
       },
-      "gridPos": { "h": 6, "w": 4, "x": 4, "y": 1 },
+      "gridPos": {"h": 6, "w": 4, "x": 4, "y": 1},
       "id": 2,
-      "options": { "orientation": "auto", "reduceOptions": { "calcs": ["lastNotNull"] }, "showThresholdMarkers": true },
+      "options": {"orientation": "auto", "reduceOptions": {"calcs": ["lastNotNull"]}, "showThresholdMarkers": true},
       "targets": [{
-        "datasource": { "type": "prometheus", "uid": "prometheus" },
+        "datasource": {"type": "prometheus", "uid": "prometheus"},
         "expr": "(1 - node_memory_MemAvailable_bytes{job=\"proxmox-node\"} / node_memory_MemTotal_bytes{job=\"proxmox-node\"}) * 100",
-        "legendFormat": "RAM", "refId": "A"
+        "legendFormat": "RAM Real", "refId": "A"
       }],
-      "title": "RAM Usage",
+      "title": "RAM — Pressão Real (excl. cache)",
       "type": "gauge"
     },
+
     {
-      "datasource": { "type": "prometheus", "uid": "prometheus" },
+      "datasource": {"type": "prometheus", "uid": "prometheus"},
       "fieldConfig": {
         "defaults": {
-          "color": { "mode": "thresholds" },
-          "thresholds": { "mode": "percentage", "steps": [
-            { "color": "green", "value": null },
-            { "color": "yellow", "value": 70 },
-            { "color": "red", "value": 90 }
+          "color": {"mode": "thresholds"},
+          "thresholds": {"mode": "percentage", "steps": [
+            {"color": "green", "value": null},
+            {"color": "yellow", "value": 70},
+            {"color": "red", "value": 90}
           ]},
           "unit": "percent", "min": 0, "max": 100
-        }, "overrides": []
+        },
+        "overrides": []
       },
-      "gridPos": { "h": 6, "w": 4, "x": 8, "y": 1 },
+      "gridPos": {"h": 6, "w": 4, "x": 8, "y": 1},
       "id": 3,
-      "options": { "orientation": "auto", "reduceOptions": { "calcs": ["lastNotNull"] }, "showThresholdMarkers": true },
+      "options": {"orientation": "auto", "reduceOptions": {"calcs": ["lastNotNull"]}, "showThresholdMarkers": true},
       "targets": [{
-        "datasource": { "type": "prometheus", "uid": "prometheus" },
+        "datasource": {"type": "prometheus", "uid": "prometheus"},
         "expr": "(node_filesystem_size_bytes{job=\"proxmox-node\",mountpoint=\"/\",fstype!=\"tmpfs\"} - node_filesystem_free_bytes{job=\"proxmox-node\",mountpoint=\"/\",fstype!=\"tmpfs\"}) / node_filesystem_size_bytes{job=\"proxmox-node\",mountpoint=\"/\",fstype!=\"tmpfs\"} * 100",
         "legendFormat": "Disk /", "refId": "A"
       }],
       "title": "Disk Usage /",
       "type": "gauge"
     },
+
     {
-      "datasource": { "type": "prometheus", "uid": "prometheus" },
+      "datasource": {"type": "prometheus", "uid": "prometheus"},
       "fieldConfig": {
-        "defaults": { "color": { "fixedColor": "blue", "mode": "fixed" }, "unit": "short" },
-        "overrides": []
+        "defaults": {"color": {"fixedColor": "green", "mode": "fixed"}, "unit": "dtdurations"}
       },
-      "gridPos": { "h": 3, "w": 6, "x": 12, "y": 1 },
+      "gridPos": {"h": 3, "w": 6, "x": 12, "y": 1},
       "id": 4,
-      "options": { "colorMode": "background", "graphMode": "none", "justifyMode": "center", "reduceOptions": { "calcs": ["lastNotNull"] }, "textMode": "auto" },
+      "options": {"colorMode": "background", "graphMode": "none", "justifyMode": "center", "reduceOptions": {"calcs": ["lastNotNull"]}, "textMode": "auto"},
       "targets": [{
-        "datasource": { "type": "prometheus", "uid": "prometheus" },
-        "expr": "node_load1{job=\"proxmox-node\"}",
-        "legendFormat": "Load 1m", "refId": "A"
-      }],
-      "title": "Load Average 1m",
-      "type": "stat"
-    },
-    {
-      "datasource": { "type": "prometheus", "uid": "prometheus" },
-      "fieldConfig": {
-        "defaults": { "color": { "fixedColor": "green", "mode": "fixed" }, "unit": "dtdurations" },
-        "overrides": []
-      },
-      "gridPos": { "h": 3, "w": 6, "x": 18, "y": 1 },
-      "id": 5,
-      "options": { "colorMode": "background", "graphMode": "none", "justifyMode": "center", "reduceOptions": { "calcs": ["lastNotNull"] }, "textMode": "auto" },
-      "targets": [{
-        "datasource": { "type": "prometheus", "uid": "prometheus" },
+        "datasource": {"type": "prometheus", "uid": "prometheus"},
         "expr": "node_time_seconds{job=\"proxmox-node\"} - node_boot_time_seconds{job=\"proxmox-node\"}",
         "legendFormat": "Uptime", "refId": "A"
       }],
       "title": "Uptime",
       "type": "stat"
     },
+
     {
-      "datasource": { "type": "prometheus", "uid": "prometheus" },
+      "datasource": {"type": "prometheus", "uid": "prometheus"},
       "fieldConfig": {
-        "defaults": { "color": { "fixedColor": "blue", "mode": "fixed" }, "unit": "short" },
-        "overrides": []
+        "defaults": {"color": {"fixedColor": "blue", "mode": "fixed"}, "unit": "short", "decimals": 2}
       },
-      "gridPos": { "h": 3, "w": 6, "x": 12, "y": 4 },
-      "id": 6,
-      "options": { "colorMode": "background", "graphMode": "none", "justifyMode": "center", "reduceOptions": { "calcs": ["lastNotNull"] }, "textMode": "auto" },
+      "gridPos": {"h": 3, "w": 6, "x": 18, "y": 1},
+      "id": 5,
+      "options": {"colorMode": "background", "graphMode": "none", "justifyMode": "center", "reduceOptions": {"calcs": ["lastNotNull"]}, "textMode": "auto"},
       "targets": [{
-        "datasource": { "type": "prometheus", "uid": "prometheus" },
+        "datasource": {"type": "prometheus", "uid": "prometheus"},
+        "expr": "node_load1{job=\"proxmox-node\"}",
+        "legendFormat": "Load 1m", "refId": "A"
+      }],
+      "title": "Load Average 1m",
+      "type": "stat"
+    },
+
+    {
+      "datasource": {"type": "prometheus", "uid": "prometheus"},
+      "fieldConfig": {
+        "defaults": {"color": {"fixedColor": "blue", "mode": "fixed"}, "unit": "bytes"}
+      },
+      "gridPos": {"h": 3, "w": 6, "x": 12, "y": 4},
+      "id": 6,
+      "options": {"colorMode": "background", "graphMode": "none", "justifyMode": "center", "reduceOptions": {"calcs": ["lastNotNull"]}, "textMode": "auto"},
+      "targets": [{
+        "datasource": {"type": "prometheus", "uid": "prometheus"},
+        "expr": "node_memory_MemAvailable_bytes{job=\"proxmox-node\"}",
+        "legendFormat": "RAM Disponível", "refId": "A"
+      }],
+      "title": "RAM Disponível (real)",
+      "type": "stat"
+    },
+
+    {
+      "datasource": {"type": "prometheus", "uid": "prometheus"},
+      "fieldConfig": {
+        "defaults": {"color": {"fixedColor": "blue", "mode": "fixed"}, "unit": "short", "decimals": 2}
+      },
+      "gridPos": {"h": 3, "w": 6, "x": 18, "y": 4},
+      "id": 7,
+      "options": {"colorMode": "background", "graphMode": "none", "justifyMode": "center", "reduceOptions": {"calcs": ["lastNotNull"]}, "textMode": "auto"},
+      "targets": [{
+        "datasource": {"type": "prometheus", "uid": "prometheus"},
         "expr": "node_load5{job=\"proxmox-node\"}",
         "legendFormat": "Load 5m", "refId": "A"
       }],
       "title": "Load Average 5m",
       "type": "stat"
     },
+
     {
-      "datasource": { "type": "prometheus", "uid": "prometheus" },
-      "fieldConfig": {
-        "defaults": { "color": { "fixedColor": "blue", "mode": "fixed" }, "unit": "short" },
-        "overrides": []
-      },
-      "gridPos": { "h": 3, "w": 6, "x": 18, "y": 4 },
-      "id": 7,
-      "options": { "colorMode": "background", "graphMode": "none", "justifyMode": "center", "reduceOptions": { "calcs": ["lastNotNull"] }, "textMode": "auto" },
-      "targets": [{
-        "datasource": { "type": "prometheus", "uid": "prometheus" },
-        "expr": "node_load15{job=\"proxmox-node\"}",
-        "legendFormat": "Load 15m", "refId": "A"
-      }],
-      "title": "Load Average 15m",
-      "type": "stat"
-    },
-    {
-      "datasource": { "type": "prometheus", "uid": "prometheus" },
-      "fieldConfig": { "defaults": { "unit": "percentunit" }, "overrides": [] },
-      "gridPos": { "h": 8, "w": 12, "x": 0, "y": 7 },
+      "datasource": {"type": "prometheus", "uid": "prometheus"},
+      "fieldConfig": {"defaults": {"unit": "percentunit"}, "overrides": []},
+      "gridPos": {"h": 8, "w": 12, "x": 0, "y": 7},
       "id": 8,
-      "options": { "legend": { "calcs": ["mean", "max"], "displayMode": "table", "placement": "bottom" }, "tooltip": { "mode": "multi" } },
+      "options": {
+        "legend": {"calcs": ["mean", "max"], "displayMode": "table", "placement": "bottom"},
+        "tooltip": {"mode": "multi"}
+      },
       "targets": [{
-        "datasource": { "type": "prometheus", "uid": "prometheus" },
+        "datasource": {"type": "prometheus", "uid": "prometheus"},
         "expr": "avg(rate(node_cpu_seconds_total{job=\"proxmox-node\",mode!=\"idle\"}[$__rate_interval]))",
-        "legendFormat": "CPU", "refId": "A"
+        "legendFormat": "CPU Total", "refId": "A"
+      }, {
+        "datasource": {"type": "prometheus", "uid": "prometheus"},
+        "expr": "avg(rate(node_cpu_seconds_total{job=\"proxmox-node\",mode=\"iowait\"}[$__rate_interval]))",
+        "legendFormat": "IO Wait", "refId": "B"
+      }, {
+        "datasource": {"type": "prometheus", "uid": "prometheus"},
+        "expr": "avg(rate(node_cpu_seconds_total{job=\"proxmox-node\",mode=\"system\"}[$__rate_interval]))",
+        "legendFormat": "System", "refId": "C"
       }],
       "title": "CPU Usage over time",
       "type": "timeseries"
     },
+
     {
-      "datasource": { "type": "prometheus", "uid": "prometheus" },
-      "fieldConfig": { "defaults": { "unit": "bytes" }, "overrides": [] },
-      "gridPos": { "h": 8, "w": 12, "x": 12, "y": 7 },
+      "datasource": {"type": "prometheus", "uid": "prometheus"},
+      "description": "Distribuição REAL da RAM do host Proxmox. 'Apps' = uso efetivo de processos. 'Cache+Buffers' = cache de disco do SO (reclaimável — o kernel libera imediatamente se precisar). 'Livre' = completamente livre. O console do Proxmox soma Apps + Cache = mostra como 'Usado'.",
+      "fieldConfig": {
+        "defaults": {
+          "custom": {
+            "lineWidth": 0,
+            "fillOpacity": 80,
+            "stacking": {"group": "A", "mode": "normal"},
+            "showPoints": "never"
+          },
+          "unit": "bytes"
+        },
+        "overrides": [
+          {
+            "matcher": {"id": "byName", "options": "Apps"},
+            "properties": [{"id": "color", "value": {"fixedColor": "dark-orange", "mode": "fixed"}}]
+          },
+          {
+            "matcher": {"id": "byName", "options": "Cache + Buffers"},
+            "properties": [{"id": "color", "value": {"fixedColor": "dark-green", "mode": "fixed"}}]
+          },
+          {
+            "matcher": {"id": "byName", "options": "Livre"},
+            "properties": [{"id": "color", "value": {"fixedColor": "dark-blue", "mode": "fixed"}}]
+          }
+        ]
+      },
+      "gridPos": {"h": 8, "w": 12, "x": 12, "y": 7},
       "id": 9,
-      "options": { "legend": { "calcs": ["mean", "max"], "displayMode": "table", "placement": "bottom" }, "tooltip": { "mode": "multi" } },
+      "options": {
+        "legend": {"calcs": ["mean", "lastNotNull"], "displayMode": "table", "placement": "bottom"},
+        "tooltip": {"mode": "multi"}
+      },
       "targets": [
         {
-          "datasource": { "type": "prometheus", "uid": "prometheus" },
-          "expr": "node_memory_MemTotal_bytes{job=\"proxmox-node\"} - node_memory_MemAvailable_bytes{job=\"proxmox-node\"}",
-          "legendFormat": "Used", "refId": "A"
+          "datasource": {"type": "prometheus", "uid": "prometheus"},
+          "expr": "node_memory_MemTotal_bytes{job=\"proxmox-node\"} - node_memory_MemFree_bytes{job=\"proxmox-node\"} - node_memory_Buffers_bytes{job=\"proxmox-node\"} - node_memory_Cached_bytes{job=\"proxmox-node\"} - node_memory_SReclaimable_bytes{job=\"proxmox-node\"}",
+          "legendFormat": "Apps", "refId": "A"
         },
         {
-          "datasource": { "type": "prometheus", "uid": "prometheus" },
-          "expr": "node_memory_MemTotal_bytes{job=\"proxmox-node\"}",
-          "legendFormat": "Total", "refId": "B"
+          "datasource": {"type": "prometheus", "uid": "prometheus"},
+          "expr": "node_memory_Buffers_bytes{job=\"proxmox-node\"} + node_memory_Cached_bytes{job=\"proxmox-node\"} + node_memory_SReclaimable_bytes{job=\"proxmox-node\"}",
+          "legendFormat": "Cache + Buffers", "refId": "B"
+        },
+        {
+          "datasource": {"type": "prometheus", "uid": "prometheus"},
+          "expr": "node_memory_MemFree_bytes{job=\"proxmox-node\"}",
+          "legendFormat": "Livre", "refId": "C"
         }
       ],
-      "title": "RAM Usage over time",
+      "title": "RAM Host — Distribuição Real (Apps / Cache / Livre)",
       "type": "timeseries"
     },
+
     {
-      "datasource": { "type": "prometheus", "uid": "prometheus" },
-      "fieldConfig": { "defaults": { "unit": "Bps" }, "overrides": [] },
-      "gridPos": { "h": 8, "w": 24, "x": 0, "y": 15 },
+      "datasource": {"type": "prometheus", "uid": "prometheus"},
+      "fieldConfig": {"defaults": {"unit": "Bps"}, "overrides": []},
+      "gridPos": {"h": 8, "w": 24, "x": 0, "y": 15},
       "id": 10,
-      "options": { "legend": { "calcs": ["mean", "max"], "displayMode": "table", "placement": "bottom" }, "tooltip": { "mode": "multi" } },
+      "options": {
+        "legend": {"calcs": ["mean", "max"], "displayMode": "table", "placement": "bottom"},
+        "tooltip": {"mode": "multi"}
+      },
       "targets": [
         {
-          "datasource": { "type": "prometheus", "uid": "prometheus" },
+          "datasource": {"type": "prometheus", "uid": "prometheus"},
           "expr": "rate(node_network_transmit_bytes_total{job=\"proxmox-node\",device!=\"lo\"}[$__rate_interval])",
           "legendFormat": "TX {{device}}", "refId": "A"
         },
         {
-          "datasource": { "type": "prometheus", "uid": "prometheus" },
-          "expr": "rate(node_network_receive_bytes_total{job=\"proxmox-node\",device!=\"lo\"}[$__rate_interval])",
+          "datasource": {"type": "prometheus", "uid": "prometheus"},
+          "expr": "-rate(node_network_receive_bytes_total{job=\"proxmox-node\",device!=\"lo\"}[$__rate_interval])",
           "legendFormat": "RX {{device}}", "refId": "B"
         }
       ],
-      "title": "Network TX / RX",
+      "title": "Network TX / RX (host)",
       "type": "timeseries"
     },
+
     {
       "collapsed": false,
-      "gridPos": { "h": 1, "w": 24, "x": 0, "y": 23 },
-      "id": 101,
-      "title": "VMs & LXC Containers",
+      "gridPos": {"h": 1, "w": 24, "x": 0, "y": 23},
+      "id": 200,
+      "title": "K8s Nodes — Memória Real (de dentro das VMs)",
+      "description": "Dados coletados pelo node-exporter DaemonSet do kube-prometheus-stack, rodando dentro de cada VM. Usa MemAvailable — dado correto, diferente do que o Proxmox API reporta.",
       "type": "row"
     },
+
     {
-      "datasource": { "type": "prometheus", "uid": "prometheus" },
+      "datasource": {"type": "prometheus", "uid": "prometheus"},
+      "description": "Tabela de memória real dos nodes K8s. Pressão Real % usa MemAvailable — exclui page cache reclaimável. É o dado que importa para decisões de capacidade.",
       "fieldConfig": {
         "defaults": {},
         "overrides": [
           {
-            "matcher": { "id": "byName", "options": "Status" },
+            "matcher": {"id": "byName", "options": "Node"},
+            "properties": [{"id": "custom.width", "value": 120}]
+          },
+          {
+            "matcher": {"id": "byName", "options": "RAM Total"},
+            "properties": [{"id": "unit", "value": "bytes"}, {"id": "custom.width", "value": 110}]
+          },
+          {
+            "matcher": {"id": "byName", "options": "Apps Usada"},
+            "properties": [{"id": "unit", "value": "bytes"}, {"id": "custom.width", "value": 110}]
+          },
+          {
+            "matcher": {"id": "byName", "options": "Cache + Buffers"},
+            "properties": [{"id": "unit", "value": "bytes"}, {"id": "custom.width", "value": 130}]
+          },
+          {
+            "matcher": {"id": "byName", "options": "Disponível Real"},
+            "properties": [{"id": "unit", "value": "bytes"}, {"id": "custom.width", "value": 130}]
+          },
+          {
+            "matcher": {"id": "byName", "options": "Pressão Real %"},
             "properties": [
-              { "id": "custom.displayMode", "value": "color-background" },
-              { "id": "mappings", "value": [
-                { "options": { "1": { "color": "green", "index": 0, "text": "running" } }, "type": "value" },
-                { "options": { "0": { "color": "red",   "index": 1, "text": "stopped" } }, "type": "value" }
-              ]}
+              {"id": "unit", "value": "percent"},
+              {"id": "custom.displayMode", "value": "color-background"},
+              {"id": "thresholds", "value": {
+                "mode": "absolute",
+                "steps": [
+                  {"color": "green", "value": null},
+                  {"color": "yellow", "value": 60},
+                  {"color": "red", "value": 80}
+                ]
+              }},
+              {"id": "custom.width", "value": 130}
             ]
-          },
-          {
-            "matcher": { "id": "byName", "options": "CPU %" },
-            "properties": [{ "id": "unit", "value": "percentunit" }]
-          },
-          {
-            "matcher": { "id": "byName", "options": "RAM Used" },
-            "properties": [{ "id": "unit", "value": "bytes" }]
-          },
-          {
-            "matcher": { "id": "byName", "options": "RAM Total" },
-            "properties": [{ "id": "unit", "value": "bytes" }]
           }
         ]
       },
-      "gridPos": { "h": 8, "w": 24, "x": 0, "y": 24 },
-      "id": 11,
-      "options": { "footer": { "show": false }, "showHeader": true, "sortBy": [{ "desc": false, "displayName": "Name" }] },
+      "gridPos": {"h": 8, "w": 24, "x": 0, "y": 24},
+      "id": 20,
+      "options": {"footer": {"show": false}, "showHeader": true, "sortBy": [{"desc": false, "displayName": "Node"}]},
       "targets": [
         {
-          "datasource": { "type": "prometheus", "uid": "prometheus" },
-          "expr": "proxmox_guest_status{job=\"proxmox-node\",name=~\"$guest\"}",
+          "datasource": {"type": "prometheus", "uid": "prometheus"},
+          "expr": "node_memory_MemTotal_bytes{job=\"node-exporter\"} * on(instance) group_left(nodename) node_uname_info{job=\"node-exporter\",nodename=~\"$node\"}",
           "format": "table", "instant": true, "refId": "A"
         },
         {
-          "datasource": { "type": "prometheus", "uid": "prometheus" },
-          "expr": "proxmox_guest_cpu_usage{job=\"proxmox-node\",name=~\"$guest\"}",
+          "datasource": {"type": "prometheus", "uid": "prometheus"},
+          "expr": "(node_memory_MemTotal_bytes{job=\"node-exporter\"} - node_memory_MemFree_bytes{job=\"node-exporter\"} - node_memory_Buffers_bytes{job=\"node-exporter\"} - node_memory_Cached_bytes{job=\"node-exporter\"} - node_memory_SReclaimable_bytes{job=\"node-exporter\"}) * on(instance) group_left(nodename) node_uname_info{job=\"node-exporter\",nodename=~\"$node\"}",
           "format": "table", "instant": true, "refId": "B"
         },
         {
-          "datasource": { "type": "prometheus", "uid": "prometheus" },
-          "expr": "proxmox_guest_memory_used_bytes{job=\"proxmox-node\",name=~\"$guest\"}",
+          "datasource": {"type": "prometheus", "uid": "prometheus"},
+          "expr": "(node_memory_Buffers_bytes{job=\"node-exporter\"} + node_memory_Cached_bytes{job=\"node-exporter\"} + node_memory_SReclaimable_bytes{job=\"node-exporter\"}) * on(instance) group_left(nodename) node_uname_info{job=\"node-exporter\",nodename=~\"$node\"}",
           "format": "table", "instant": true, "refId": "C"
         },
         {
-          "datasource": { "type": "prometheus", "uid": "prometheus" },
-          "expr": "proxmox_guest_memory_max_bytes{job=\"proxmox-node\",name=~\"$guest\"}",
+          "datasource": {"type": "prometheus", "uid": "prometheus"},
+          "expr": "node_memory_MemAvailable_bytes{job=\"node-exporter\"} * on(instance) group_left(nodename) node_uname_info{job=\"node-exporter\",nodename=~\"$node\"}",
           "format": "table", "instant": true, "refId": "D"
+        },
+        {
+          "datasource": {"type": "prometheus", "uid": "prometheus"},
+          "expr": "(1 - node_memory_MemAvailable_bytes{job=\"node-exporter\"} / node_memory_MemTotal_bytes{job=\"node-exporter\"}) * 100 * on(instance) group_left(nodename) node_uname_info{job=\"node-exporter\",nodename=~\"$node\"}",
+          "format": "table", "instant": true, "refId": "E"
         }
       ],
-      "title": "Guest Overview",
+      "title": "Memória Real por Node K8s",
       "transformations": [
-        { "id": "merge", "options": {} },
-        { "id": "filterFieldsByName", "options": { "include": { "names": ["name", "type", "vmid", "Value #A", "Value #B", "Value #C", "Value #D"] } } },
-        { "id": "organize", "options": { "renameByName": {
-          "name": "Name", "type": "Type", "vmid": "VMID",
-          "Value #A": "Status", "Value #B": "CPU %",
-          "Value #C": "RAM Used", "Value #D": "RAM Total"
+        {"id": "merge", "options": {}},
+        {"id": "filterFieldsByName", "options": {"include": {"names": ["nodename", "Value #A", "Value #B", "Value #C", "Value #D", "Value #E"]}}},
+        {"id": "organize", "options": {"renameByName": {
+          "nodename": "Node",
+          "Value #A": "RAM Total",
+          "Value #B": "Apps Usada",
+          "Value #C": "Cache + Buffers",
+          "Value #D": "Disponível Real",
+          "Value #E": "Pressão Real %"
         }}}
       ],
       "type": "table"
     },
+
     {
-      "datasource": { "type": "prometheus", "uid": "prometheus" },
-      "fieldConfig": { "defaults": { "unit": "percentunit" }, "overrides": [] },
-      "gridPos": { "h": 8, "w": 24, "x": 0, "y": 32 },
-      "id": 12,
-      "options": { "legend": { "calcs": ["mean", "max"], "displayMode": "table", "placement": "bottom" }, "tooltip": { "mode": "multi" } },
+      "datasource": {"type": "prometheus", "uid": "prometheus"},
+      "description": "Pressão REAL de RAM por node K8s ao longo do tempo. Usa MemAvailable. Verde < 60%, Amarelo 60-80%, Vermelho > 80%.",
+      "fieldConfig": {
+        "defaults": {
+          "unit": "percentunit",
+          "thresholds": {"mode": "absolute", "steps": [
+            {"color": "green", "value": null},
+            {"color": "yellow", "value": 0.6},
+            {"color": "red", "value": 0.8}
+          ]},
+          "custom": {"thresholdsStyle": {"mode": "line+area"}}
+        },
+        "overrides": []
+      },
+      "gridPos": {"h": 8, "w": 12, "x": 0, "y": 32},
+      "id": 21,
+      "options": {
+        "legend": {"calcs": ["mean", "max", "lastNotNull"], "displayMode": "table", "placement": "bottom"},
+        "tooltip": {"mode": "multi"}
+      },
       "targets": [{
-        "datasource": { "type": "prometheus", "uid": "prometheus" },
+        "datasource": {"type": "prometheus", "uid": "prometheus"},
+        "expr": "(1 - node_memory_MemAvailable_bytes{job=\"node-exporter\"} / node_memory_MemTotal_bytes{job=\"node-exporter\"}) * on(instance) group_left(nodename) node_uname_info{job=\"node-exporter\",nodename=~\"$node\"}",
+        "legendFormat": "{{nodename}}", "refId": "A"
+      }],
+      "title": "Pressão RAM Real por Node K8s",
+      "type": "timeseries"
+    },
+
+    {
+      "datasource": {"type": "prometheus", "uid": "prometheus"},
+      "description": "Memória de apps (sem cache) por node K8s. Este é o consumo efetivo dos workloads.",
+      "fieldConfig": {
+        "defaults": {"unit": "bytes"},
+        "overrides": []
+      },
+      "gridPos": {"h": 8, "w": 12, "x": 12, "y": 32},
+      "id": 22,
+      "options": {
+        "legend": {"calcs": ["mean", "max", "lastNotNull"], "displayMode": "table", "placement": "bottom"},
+        "tooltip": {"mode": "multi"}
+      },
+      "targets": [{
+        "datasource": {"type": "prometheus", "uid": "prometheus"},
+        "expr": "(node_memory_MemTotal_bytes{job=\"node-exporter\"} - node_memory_MemFree_bytes{job=\"node-exporter\"} - node_memory_Buffers_bytes{job=\"node-exporter\"} - node_memory_Cached_bytes{job=\"node-exporter\"} - node_memory_SReclaimable_bytes{job=\"node-exporter\"}) * on(instance) group_left(nodename) node_uname_info{job=\"node-exporter\",nodename=~\"$node\"}",
+        "legendFormat": "{{nodename}} — apps", "refId": "A"
+      }, {
+        "datasource": {"type": "prometheus", "uid": "prometheus"},
+        "expr": "node_memory_MemAvailable_bytes{job=\"node-exporter\"} * on(instance) group_left(nodename) node_uname_info{job=\"node-exporter\",nodename=~\"$node\"}",
+        "legendFormat": "{{nodename}} — disponível", "refId": "B"
+      }],
+      "title": "RAM: Apps Usada vs Disponível por Node K8s",
+      "type": "timeseries"
+    },
+
+    {
+      "collapsed": false,
+      "gridPos": {"h": 1, "w": 24, "x": 0, "y": 40},
+      "id": 300,
+      "title": "VMs & LXC Containers — Visão do Hypervisor",
+      "description": "Métricas coletadas via Proxmox API pelo textfile collector. A memória reportada pelo hypervisor inclui o page cache do SO guest — por isso mostra valores mais altos que o uso real.",
+      "type": "row"
+    },
+
+    {
+      "datasource": {"type": "prometheus", "uid": "prometheus"},
+      "description": "Status atual de todos os guests. Status: 1=running (verde), 0=stopped (vermelho). RAM Usada e RAM Total são os valores reportados pelo hypervisor (Proxmox API) — incluem cache do SO guest.",
+      "fieldConfig": {
+        "defaults": {},
+        "overrides": [
+          {
+            "matcher": {"id": "byName", "options": "Status"},
+            "properties": [
+              {"id": "custom.displayMode", "value": "color-background"},
+              {"id": "mappings", "value": [
+                {"options": {"1": {"color": "green", "index": 0, "text": "running"}}, "type": "value"},
+                {"options": {"0": {"color": "red",   "index": 1, "text": "stopped"}}, "type": "value"}
+              ]}
+            ]
+          },
+          {
+            "matcher": {"id": "byName", "options": "CPU %"},
+            "properties": [{"id": "unit", "value": "percentunit"}]
+          },
+          {
+            "matcher": {"id": "byName", "options": "RAM Usada *"},
+            "properties": [{"id": "unit", "value": "bytes"}]
+          },
+          {
+            "matcher": {"id": "byName", "options": "RAM Total"},
+            "properties": [{"id": "unit", "value": "bytes"}]
+          },
+          {
+            "matcher": {"id": "byName", "options": "RAM % *"},
+            "properties": [
+              {"id": "unit", "value": "percent"},
+              {"id": "custom.displayMode", "value": "color-background"},
+              {"id": "thresholds", "value": {
+                "mode": "absolute",
+                "steps": [
+                  {"color": "green", "value": null},
+                  {"color": "yellow", "value": 70},
+                  {"color": "red", "value": 90}
+                ]
+              }}
+            ]
+          }
+        ]
+      },
+      "gridPos": {"h": 8, "w": 24, "x": 0, "y": 41},
+      "id": 30,
+      "options": {"footer": {"show": false}, "showHeader": true, "sortBy": [{"desc": false, "displayName": "Name"}]},
+      "targets": [
+        {
+          "datasource": {"type": "prometheus", "uid": "prometheus"},
+          "expr": "proxmox_guest_status{job=\"proxmox-node\",name=~\"$guest\"}",
+          "format": "table", "instant": true, "refId": "A"
+        },
+        {
+          "datasource": {"type": "prometheus", "uid": "prometheus"},
+          "expr": "proxmox_guest_cpu_usage{job=\"proxmox-node\",name=~\"$guest\"}",
+          "format": "table", "instant": true, "refId": "B"
+        },
+        {
+          "datasource": {"type": "prometheus", "uid": "prometheus"},
+          "expr": "proxmox_guest_memory_used_bytes{job=\"proxmox-node\",name=~\"$guest\"}",
+          "format": "table", "instant": true, "refId": "C"
+        },
+        {
+          "datasource": {"type": "prometheus", "uid": "prometheus"},
+          "expr": "proxmox_guest_memory_max_bytes{job=\"proxmox-node\",name=~\"$guest\"}",
+          "format": "table", "instant": true, "refId": "D"
+        },
+        {
+          "datasource": {"type": "prometheus", "uid": "prometheus"},
+          "expr": "proxmox_guest_memory_used_bytes{job=\"proxmox-node\",name=~\"$guest\"} / proxmox_guest_memory_max_bytes{job=\"proxmox-node\",name=~\"$guest\"} * 100",
+          "format": "table", "instant": true, "refId": "E"
+        }
+      ],
+      "title": "Guest Overview (hypervisor-reported — RAM inclui cache do SO)",
+      "transformations": [
+        {"id": "merge", "options": {}},
+        {"id": "filterFieldsByName", "options": {"include": {"names": ["name", "type", "vmid", "Value #A", "Value #B", "Value #C", "Value #D", "Value #E"]}}},
+        {"id": "organize", "options": {"renameByName": {
+          "name": "Name", "type": "Type", "vmid": "VMID",
+          "Value #A": "Status",
+          "Value #B": "CPU %",
+          "Value #C": "RAM Usada *",
+          "Value #D": "RAM Total",
+          "Value #E": "RAM % *"
+        }}}
+      ],
+      "type": "table"
+    },
+
+    {
+      "datasource": {"type": "prometheus", "uid": "prometheus"},
+      "fieldConfig": {"defaults": {"unit": "percentunit"}, "overrides": []},
+      "gridPos": {"h": 8, "w": 24, "x": 0, "y": 49},
+      "id": 31,
+      "options": {
+        "legend": {"calcs": ["mean", "max"], "displayMode": "table", "placement": "bottom"},
+        "tooltip": {"mode": "multi"}
+      },
+      "targets": [{
+        "datasource": {"type": "prometheus", "uid": "prometheus"},
         "expr": "proxmox_guest_cpu_usage{job=\"proxmox-node\",name=~\"$guest\"}",
         "legendFormat": "{{name}} ({{type}})", "refId": "A"
       }],
-      "title": "CPU Usage per Guest",
+      "title": "CPU Usage por Guest",
       "type": "timeseries"
     },
+
     {
-      "datasource": { "type": "prometheus", "uid": "prometheus" },
-      "fieldConfig": { "defaults": { "unit": "percentunit" }, "overrides": [] },
-      "gridPos": { "h": 8, "w": 24, "x": 0, "y": 40 },
-      "id": 13,
-      "options": { "legend": { "calcs": ["mean", "max"], "displayMode": "table", "placement": "bottom" }, "tooltip": { "mode": "multi" } },
+      "datasource": {"type": "prometheus", "uid": "prometheus"},
+      "description": "RAM reportada pelo hypervisor (Proxmox API). Para VMs K8s, este valor INCLUI o page cache do Linux — é por isso que o console mostra ~90% mesmo com workloads leves. Use a seção 'K8s Nodes' acima para o dado real.",
+      "fieldConfig": {"defaults": {"unit": "percentunit"}, "overrides": []},
+      "gridPos": {"h": 8, "w": 24, "x": 0, "y": 57},
+      "id": 32,
+      "options": {
+        "legend": {"calcs": ["mean", "max"], "displayMode": "table", "placement": "bottom"},
+        "tooltip": {"mode": "multi"}
+      },
       "targets": [{
-        "datasource": { "type": "prometheus", "uid": "prometheus" },
+        "datasource": {"type": "prometheus", "uid": "prometheus"},
         "expr": "proxmox_guest_memory_used_bytes{job=\"proxmox-node\",name=~\"$guest\"} / proxmox_guest_memory_max_bytes{job=\"proxmox-node\",name=~\"$guest\"} > 0",
         "legendFormat": "{{name}} ({{type}})", "refId": "A"
       }],
-      "title": "RAM Usage % per Guest",
+      "title": "RAM % por Guest — Hypervisor (inclui cache do SO — use seção K8s para dado real)",
       "type": "timeseries"
     },
+
     {
-      "datasource": { "type": "prometheus", "uid": "prometheus" },
-      "fieldConfig": { "defaults": { "unit": "Bps" }, "overrides": [] },
-      "gridPos": { "h": 8, "w": 12, "x": 0, "y": 48 },
-      "id": 14,
-      "options": { "legend": { "calcs": ["mean", "max"], "displayMode": "table", "placement": "bottom" }, "tooltip": { "mode": "multi" } },
+      "datasource": {"type": "prometheus", "uid": "prometheus"},
+      "fieldConfig": {"defaults": {"unit": "Bps"}, "overrides": []},
+      "gridPos": {"h": 8, "w": 12, "x": 0, "y": 65},
+      "id": 33,
+      "options": {
+        "legend": {"calcs": ["mean", "max"], "displayMode": "table", "placement": "bottom"},
+        "tooltip": {"mode": "multi"}
+      },
       "targets": [{
-        "datasource": { "type": "prometheus", "uid": "prometheus" },
+        "datasource": {"type": "prometheus", "uid": "prometheus"},
         "expr": "rate(proxmox_guest_netout_bytes_total{job=\"proxmox-node\",name=~\"$guest\"}[$__rate_interval])",
         "legendFormat": "{{name}} TX", "refId": "A"
       }],
-      "title": "Network TX per Guest",
+      "title": "Network TX por Guest",
       "type": "timeseries"
     },
+
     {
-      "datasource": { "type": "prometheus", "uid": "prometheus" },
-      "fieldConfig": { "defaults": { "unit": "Bps" }, "overrides": [] },
-      "gridPos": { "h": 8, "w": 12, "x": 12, "y": 48 },
-      "id": 15,
-      "options": { "legend": { "calcs": ["mean", "max"], "displayMode": "table", "placement": "bottom" }, "tooltip": { "mode": "multi" } },
+      "datasource": {"type": "prometheus", "uid": "prometheus"},
+      "fieldConfig": {"defaults": {"unit": "Bps"}, "overrides": []},
+      "gridPos": {"h": 8, "w": 12, "x": 12, "y": 65},
+      "id": 34,
+      "options": {
+        "legend": {"calcs": ["mean", "max"], "displayMode": "table", "placement": "bottom"},
+        "tooltip": {"mode": "multi"}
+      },
       "targets": [{
-        "datasource": { "type": "prometheus", "uid": "prometheus" },
+        "datasource": {"type": "prometheus", "uid": "prometheus"},
         "expr": "rate(proxmox_guest_netin_bytes_total{job=\"proxmox-node\",name=~\"$guest\"}[$__rate_interval])",
         "legendFormat": "{{name}} RX", "refId": "A"
       }],
-      "title": "Network RX per Guest",
+      "title": "Network RX por Guest",
       "type": "timeseries"
     },
+
     {
-      "datasource": { "type": "prometheus", "uid": "prometheus" },
-      "fieldConfig": { "defaults": { "unit": "Bps" }, "overrides": [] },
-      "gridPos": { "h": 8, "w": 24, "x": 0, "y": 56 },
-      "id": 16,
-      "options": { "legend": { "calcs": ["mean", "max"], "displayMode": "table", "placement": "bottom" }, "tooltip": { "mode": "multi" } },
+      "datasource": {"type": "prometheus", "uid": "prometheus"},
+      "fieldConfig": {"defaults": {"unit": "Bps"}, "overrides": []},
+      "gridPos": {"h": 8, "w": 24, "x": 0, "y": 73},
+      "id": 35,
+      "options": {
+        "legend": {"calcs": ["mean", "max"], "displayMode": "table", "placement": "bottom"},
+        "tooltip": {"mode": "multi"}
+      },
       "targets": [
         {
-          "datasource": { "type": "prometheus", "uid": "prometheus" },
+          "datasource": {"type": "prometheus", "uid": "prometheus"},
           "expr": "rate(proxmox_guest_disk_read_bytes_total{job=\"proxmox-node\",name=~\"$guest\"}[$__rate_interval])",
           "legendFormat": "{{name}} read", "refId": "A"
         },
         {
-          "datasource": { "type": "prometheus", "uid": "prometheus" },
+          "datasource": {"type": "prometheus", "uid": "prometheus"},
           "expr": "rate(proxmox_guest_disk_write_bytes_total{job=\"proxmox-node\",name=~\"$guest\"}[$__rate_interval])",
           "legendFormat": "{{name}} write", "refId": "B"
         }
       ],
-      "title": "Disk I/O per Guest",
+      "title": "Disk I/O por Guest",
       "type": "timeseries"
     }
+
   ],
   "refresh": "30s",
   "schemaVersion": 38,
@@ -366,7 +628,7 @@
     "list": [
       {
         "current": {},
-        "datasource": { "type": "prometheus", "uid": "prometheus" },
+        "datasource": {"type": "prometheus", "uid": "prometheus"},
         "definition": "label_values(proxmox_guest_status{job=\"proxmox-node\"}, name)",
         "hide": 0,
         "includeAll": true,
@@ -382,13 +644,32 @@
         "refresh": 2,
         "sort": 1,
         "type": "query"
+      },
+      {
+        "current": {},
+        "datasource": {"type": "prometheus", "uid": "prometheus"},
+        "definition": "label_values(node_uname_info{job=\"node-exporter\"}, nodename)",
+        "hide": 0,
+        "includeAll": true,
+        "allValue": ".*",
+        "label": "K8s Node",
+        "multi": true,
+        "name": "node",
+        "options": [],
+        "query": {
+          "query": "label_values(node_uname_info{job=\"node-exporter\"}, nodename)",
+          "refId": "StandardVariableQuery"
+        },
+        "refresh": 2,
+        "sort": 1,
+        "type": "query"
       }
     ]
   },
-  "time": { "from": "now-1h", "to": "now" },
+  "time": {"from": "now-1h", "to": "now"},
   "timepicker": {},
   "timezone": "browser",
   "title": "Proxmox Node",
   "uid": "homelab-proxmox-node",
-  "version": 1
+  "version": 2
 }

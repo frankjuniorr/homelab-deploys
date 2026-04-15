@@ -111,29 +111,6 @@ ansible-playbook src/main.yaml --tags <tag>
 
 ---
 
-## Grafana Dashboards
-
-All custom dashboards live as plain `.json` files under `src/roles/grafana/files/dashboards/`. Ansible creates the ConfigMaps inline — no YAML wrapper files. To add a new dashboard:
-
-1. Drop a `my-dashboard.json` into `src/roles/grafana/files/dashboards/`
-2. Add an entry to the loop in `src/roles/grafana/tasks/main.yml`:
-   ```yaml
-   - { name: my-dashboard, folder: MyFolder }
-   ```
-
----
-
-## Certificate Trust
-
-`cert-manager` generates a self-signed Root CA and a wildcard cert for `*.frank.lab.io`. The `cluster-setup` role extracts the CA and installs it locally:
-
-- **Arch Linux** → `/etc/ca-certificates/trust-source/anchors/` + `update-ca-trust`
-- **Ubuntu/Debian** → `/usr/local/share/ca-certificates/` + `update-ca-certificates`
-- **Chrome/Firefox** → injected into NSS databases via `certutil` (if available)
-
-Run `just install-ca` to re-run only the trust installation on a new machine.
-
----
 
 ## License
 

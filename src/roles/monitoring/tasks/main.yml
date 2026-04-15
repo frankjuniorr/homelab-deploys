@@ -50,7 +50,12 @@
   register: helm_kps
   changed_when: "'has been upgraded' in helm_kps.stdout or 'has been installed' in helm_kps.stdout"
 
-- name: "Install Loki (log aggregation, single binary + filesystem storage)"
+- name: "Apply longhorn-single StorageClass (1 replica — fits homelab node disk budget)"
+  kubernetes.core.k8s:
+    state: present
+    src: "{{ role_path }}/files/longhorn-single-sc.yaml"
+
+- name: "Install Loki (log aggregation, single binary + Longhorn PVC)"
   ansible.builtin.command:
     cmd: >
       helm upgrade --install loki grafana/loki

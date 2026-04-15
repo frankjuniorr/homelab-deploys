@@ -73,6 +73,8 @@ longhorn_backup_credential_secret: longhorn-backup-secret
 longhorn_s3_endpoint: "http://192.168.1.52:3900"
 longhorn_backup_access_key: "{{ vault_longhorn_backup_access_key }}"
 longhorn_backup_secret_key: "{{ vault_longhorn_backup_secret_key }}"
+longhorn_recurring_job_name: backup-daily
+longhorn_recurring_job_cron: "0 2 * * *"   # 2 AM every day
 
 ##############################################################
 # Proxmox Host Monitoring
@@ -89,6 +91,8 @@ grafana_admin_password: "{{ vault_grafana_admin_password }}"
 # Resource limits (tune here to control cluster RAM usage)
 ##############################################################
 # Prometheus
+prometheus_scrape_interval: "60s"
+prometheus_eval_interval:   "60s"
 prometheus_retention:  "5d"
 prometheus_req_cpu:    "100m"
 prometheus_req_mem:    "256Mi"
@@ -114,11 +118,21 @@ loki_req_mem:          "64Mi"
 loki_lim_cpu:          "200m"
 loki_lim_mem:          "128Mi"
 
+# Longhorn volumes (replica count across workers)
+longhorn_default_replica_count: 2
+
 # Longhorn manager (per node — 3 nodes in cluster)
 longhorn_manager_req_cpu:  "50m"
 longhorn_manager_req_mem:  "100Mi"
 longhorn_manager_lim_cpu:  "300m"
 longhorn_manager_lim_mem:  "200Mi"
+
+##############################################################
+# Persistent storage sizes (Longhorn PVCs)
+##############################################################
+prometheus_storage_size:   "10Gi"
+loki_storage_size:         "10Gi"
+grafana_storage_size:      "1Gi"
 
 ##############################################################
 # Applications registry

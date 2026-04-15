@@ -6,7 +6,17 @@ grafana:
 
 prometheus:
   prometheusSpec:
+    scrapeInterval: "{{ prometheus_scrape_interval }}"
+    evaluationInterval: "{{ prometheus_eval_interval }}"
     retention: "{{ prometheus_retention }}"
+    storageSpec:
+      volumeClaimTemplate:
+        spec:
+          storageClassName: longhorn
+          accessModes: ["ReadWriteOnce"]
+          resources:
+            requests:
+              storage: "{{ prometheus_storage_size }}"
     additionalScrapeConfigs:
       - job_name: proxmox-node
         static_configs:

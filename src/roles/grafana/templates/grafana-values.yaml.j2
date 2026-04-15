@@ -1,5 +1,10 @@
 adminPassword: "{{ grafana_admin_password }}"
 
+persistence:
+  enabled: true
+  storageClassName: longhorn
+  size: "{{ grafana_storage_size }}"
+
 sidecar:
   dashboards:
     enabled: true

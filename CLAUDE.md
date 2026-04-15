@@ -28,6 +28,9 @@ just deploy-infra      # Only infra layer (namespaces, CRDs, Helm charts, base c
 just deploy-apps       # Only applications (podinfo and any new apps)
 just install-ca        # Only install Root CA into OS trust store and browser NSS databases
 
+# Teardown
+just destroy           # Full teardown (stops node_exporter + wipes cluster namespaces)
+
 # Secrets
 just secrets-view      # View decrypted vault.yml in terminal
 just secrets-encrypt   # Encrypt vault.yml (run before committing if manually decrypted)
@@ -177,6 +180,9 @@ No resources are placed in the `default` namespace. Each concern has its own nam
 | `longhorn-system` | Longhorn distributed block storage (created by Helm) |
 | `<app-name>` | any future application role |
 
+### Longhorn (Distributed Block Storage)
+Role: `src/roles/longhorn/`. Deployed via Helm as part of the infra layer (`--tags infra`). No manifests in `files/` — fully Helm-managed. PVCs from other roles request `longhorn` StorageClass.
+
 ## Proxmox Host Monitoring
 
 `node_exporter` runs as a systemd service directly on the Proxmox host (`192.168.1.115`). A companion bash script (`proxmox-vm-metrics.sh`) runs every 30 seconds via a systemd timer and writes per-VM/LXC metrics in Prometheus textfile format to `/var/lib/node_exporter/textfile/proxmox_guests.prom`. Prometheus scrapes `:9100` with `job_name: proxmox-node`.
@@ -229,6 +235,7 @@ Always invoke the appropriate skill via the `Skill` tool before doing work that 
 | Updating or creating `README.md` | `create-readme` |
 | Improving or auditing `CLAUDE.md` | `claude-md-improver` |
 | Diagnosing Linux/Arch Linux system issues (pacman, systemd, boot, filesystem, network, performance) | sub-agent `linux-specialist` (via `Agent` tool) |
+| Cross-layer homelab issues (Proxmox + K3s + networking + monitoring) | sub-agent `homelab-troubleshooter` (via `Agent` tool) |
 
 ## Gotchas
 

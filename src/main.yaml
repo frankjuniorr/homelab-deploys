@@ -54,6 +54,12 @@
     - apps
 
   roles:
+    - role: longhorn
+      tags:
+        - setup
+        - apps
+        - longhorn
+
     - role: podinfo
       tags:
         - setup
@@ -71,9 +77,3 @@
         - setup
         - apps
         - grafana
-
-    - role: longhorn
-      tags:
-        - setup
-        - apps
-        - longhorn

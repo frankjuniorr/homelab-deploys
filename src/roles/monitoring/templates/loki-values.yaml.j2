@@ -23,6 +23,10 @@ loki:
 
 singleBinary:
   replicas: 1
+  persistence:
+    enabled: true
+    storageClass: longhorn-single
+    size: "{{ loki_storage_size }}"
   resources:
     requests:
       cpu: "{{ loki_req_cpu }}"
