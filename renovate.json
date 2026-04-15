@@ -5,7 +5,9 @@
     {
       "description": "Envoy Gateway OCI Helm chart version",
       "customType": "regex",
-      "fileMatch": ["^src/group_vars/all/vars\\.yml$"],
+      "managerFilePatterns": [
+        "/^src/group_vars/all/vars\\.yml$/"
+      ],
       "matchStrings": ["envoy_gateway_version:\\s*(?<currentValue>v[\\d.]+)"],
       "datasourceTemplate": "docker",
       "depNameTemplate": "docker.io/envoyproxy/gateway-helm",
@@ -14,7 +16,9 @@
     {
       "description": "Gateway API CRDs version (GitHub release)",
       "customType": "regex",
-      "fileMatch": ["^src/group_vars/all/vars\\.yml$"],
+      "managerFilePatterns": [
+        "/^src/group_vars/all/vars\\.yml$/"
+      ],
       "matchStrings": ["gateway_api_version:\\s*(?<currentValue>v[\\d.]+)"],
       "datasourceTemplate": "github-releases",
       "depNameTemplate": "kubernetes-sigs/gateway-api"
@@ -22,7 +26,9 @@
     {
       "description": "MetalLB Helm chart version",
       "customType": "regex",
-      "fileMatch": ["^src/group_vars/all/vars\\.yml$"],
+      "managerFilePatterns": [
+        "/^src/group_vars/all/vars\\.yml$/"
+      ],
       "matchStrings": ["metallb_version:\\s*(?<currentValue>v[\\d.]+)"],
       "datasourceTemplate": "helm",
       "depNameTemplate": "metallb",
@@ -31,7 +37,9 @@
     {
       "description": "cert-manager Helm chart version",
       "customType": "regex",
-      "fileMatch": ["^src/group_vars/all/vars\\.yml$"],
+      "managerFilePatterns": [
+        "/^src/group_vars/all/vars\\.yml$/"
+      ],
       "matchStrings": ["cert_manager_version:\\s*(?<currentValue>v[\\d.]+)"],
       "datasourceTemplate": "helm",
       "depNameTemplate": "cert-manager",
@@ -40,7 +48,9 @@
     {
       "description": "kube-prometheus-stack Helm chart version",
       "customType": "regex",
-      "fileMatch": ["^src/group_vars/all/vars\\.yml$"],
+      "managerFilePatterns": [
+        "/^src/group_vars/all/vars\\.yml$/"
+      ],
       "matchStrings": ["kube_prometheus_stack_version:\\s*\"(?<currentValue>[\\d.]+)\""],
       "datasourceTemplate": "helm",
       "depNameTemplate": "kube-prometheus-stack",
@@ -49,7 +59,9 @@
     {
       "description": "Loki Helm chart version",
       "customType": "regex",
-      "fileMatch": ["^src/group_vars/all/vars\\.yml$"],
+      "managerFilePatterns": [
+        "/^src/group_vars/all/vars\\.yml$/"
+      ],
       "matchStrings": ["loki_version:\\s*\"(?<currentValue>[\\d.]+)\""],
       "datasourceTemplate": "helm",
       "depNameTemplate": "loki",
@@ -58,7 +70,9 @@
     {
       "description": "Longhorn Helm chart version",
       "customType": "regex",
-      "fileMatch": ["^src/group_vars/all/vars\\.yml$"],
+      "managerFilePatterns": [
+        "/^src/group_vars/all/vars\\.yml$/"
+      ],
       "matchStrings": ["longhorn_version:\\s*\"(?<currentValue>[\\d.]+)\""],
       "datasourceTemplate": "helm",
       "depNameTemplate": "longhorn",
@@ -67,7 +81,9 @@
     {
       "description": "Promtail Helm chart version",
       "customType": "regex",
-      "fileMatch": ["^src/group_vars/all/vars\\.yml$"],
+      "managerFilePatterns": [
+        "/^src/group_vars/all/vars\\.yml$/"
+      ],
       "matchStrings": ["promtail_version:\\s*\"(?<currentValue>[\\d.]+)\""],
       "datasourceTemplate": "helm",
       "depNameTemplate": "promtail",
@@ -76,7 +92,9 @@
     {
       "description": "Grafana standalone Helm chart version",
       "customType": "regex",
-      "fileMatch": ["^src/group_vars/all/vars\\.yml$"],
+      "managerFilePatterns": [
+        "/^src/group_vars/all/vars\\.yml$/"
+      ],
       "matchStrings": ["grafana_version:\\s*\"(?<currentValue>[\\d.]+)\""],
       "datasourceTemplate": "helm",
       "depNameTemplate": "grafana",
@@ -85,7 +103,9 @@
     {
       "description": "Prometheus node_exporter binary version (GitHub release)",
       "customType": "regex",
-      "fileMatch": ["^src/group_vars/all/vars\\.yml$"],
+      "managerFilePatterns": [
+        "/^src/group_vars/all/vars\\.yml$/"
+      ],
       "matchStrings": ["node_exporter_version:\\s*\"(?<currentValue>[\\d.]+)\""],
       "datasourceTemplate": "github-releases",
       "depNameTemplate": "prometheus/node_exporter"
