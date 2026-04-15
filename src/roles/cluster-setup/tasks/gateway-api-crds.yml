@@ -8,10 +8,12 @@
 ##############################################
 - name: "Install Kubernetes Gateway API Standard CRDs ({{ gateway_api_version }})"
   ansible.builtin.command:
-    cmd: "kubectl apply -f {{ gateway_api_crds_url }} --validate=false"
+    cmd: "kubectl apply --server-side=true -f {{ gateway_api_crds_url }} --validate=false"
   # kubectl apply -f <url> is used here because the manifest bundles 50+ CRD documents.
   # Applying them via kubernetes.core.k8s would create 50+ individual Ansible tasks,
   # making the output unreadable. kubectl handles the bundle natively in one call.
+  # --server-side=true is required since Gateway API v1.5.1 — CRDs exceed the annotation
+  # size limit that client-side apply uses to track managed fields.
   # --validate=false skips client-side OpenAPI schema validation, which would otherwise
   # require kubectl to fetch the schema from the API server over TLS. On a K3s cluster
   # with a self-signed API server certificate the TLS handshake fails with
