@@ -27,7 +27,7 @@ cert_manager_version: v1.20.2
 kube_prometheus_stack_version: "69.8.2"
 longhorn_version: "1.11.1"
 loki_version: "6.55.0"
-promtail_version: "6.16.6"
+promtail_version: "6.17.1"
 grafana_version: "8.15.0"
 node_exporter_version: "1.9.1"
 
