@@ -219,6 +219,18 @@ Whenever a version variable is added or modified in `src/group_vars/all/vars.yml
 
 Whenever a structural change is made to the project — new role, new `just` command, changed prerequisites, updated project layout, or new secrets workflow — **review and update `README.md`** to keep it in sync. The README is the public-facing entry point and must always reflect the actual state of the codebase.
 
+## Session Start — Renovate PR Triage
+
+When the session starts and the context contains `RENOVATE_PRS_PENDING`, perform this triage automatically (no need to ask the user):
+
+1. **Fetch full PR list** — `gh pr list --repo frankjuniorr/homelab-deploys --state open --author app/renovate --json number,title,body,url`
+2. **Evaluate each PR** — A PR is safe to approve if it is a routine version bump (Helm chart version, GitHub Action pinned SHA, dependency patch/minor) with no breaking-change notes in the body. Skip (do not approve) if the body mentions breaking changes, deprecations, or major version jumps that require config changes.
+3. **Approve safe PRs** — `gh pr review <number> --approve --repo frankjuniorr/homelab-deploys`
+4. **Sync local branch** — `git pull` after all PRs are handled
+5. **Report** — Briefly list which PRs were approved and which were skipped (and why)
+
+Use the `git-specialist` sub-agent (via `Agent` tool) for any `gh` operations if the triage is complex.
+
 ## Skills
 
 Always invoke the appropriate skill via the `Skill` tool before doing work that matches one of the entries below. Do not duplicate what the skill already does.
