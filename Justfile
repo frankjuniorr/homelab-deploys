@@ -81,6 +81,17 @@ secrets-view:
     @ansible-vault view src/group_vars/all/vault.yml --vault-password-file {{VAULT_PASS_FILE}}
 
 ############################################################################
+# PR REVIEW
+############################################################################
+# Lista PRs abertos e permite aprovar/mergear interativamente (requer gum)
+pr-review:
+    @./scripts/pr-review.sh
+
+# Lista PRs abertos em formato legível (não-interativo, para scripts/Claude)
+pr-list:
+    @./scripts/pr-review.sh --list
+
+############################################################################
 # UTILS
 ############################################################################
 # Liga/Desliga o plugin de saída estética (beautiful_output) para visualização ou debug

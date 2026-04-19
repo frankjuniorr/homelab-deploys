@@ -31,6 +31,10 @@ just install-ca        # Only install Root CA into OS trust store and browser NS
 # Teardown
 just destroy           # Full teardown (stops node_exporter + wipes cluster namespaces)
 
+# PR Review
+just pr-review         # Interactive TUI to browse, approve, and merge PRs (requires gum)
+just pr-list           # Non-interactive PR listing (for scripting / Claude)
+
 # Secrets
 just secrets-view      # View decrypted vault.yml in terminal
 just secrets-encrypt   # Encrypt vault.yml (run before committing if manually decrypted)
@@ -223,13 +227,15 @@ Whenever a structural change is made to the project — new role, new `just` com
 
 When the session starts and the context contains `RENOVATE_PRS_PENDING`, perform this triage automatically (no need to ask the user):
 
-1. **Fetch full PR list** — `gh pr list --repo frankjuniorr/homelab-deploys --state open --author app/renovate --json number,title,body,url`
+1. **Fetch full PR list** — run `just pr-list` (calls `scripts/pr-review.sh --list`), which outputs all open PRs with title, author, URL, and body in a readable format.
 2. **Evaluate each PR** — A PR is safe to approve if it is a routine version bump (Helm chart version, GitHub Action pinned SHA, dependency patch/minor) with no breaking-change notes in the body. Skip (do not approve) if the body mentions breaking changes, deprecations, or major version jumps that require config changes.
 3. **Approve safe PRs** — `gh pr review <number> --approve --repo frankjuniorr/homelab-deploys`
 4. **Sync local branch** — `git pull` after all PRs are handled
 5. **Report** — Briefly list which PRs were approved and which were skipped (and why)
 
 Use the `git-specialist` sub-agent (via `Agent` tool) for any `gh` operations if the triage is complex.
+
+> **Standalone usage:** `just pr-review` launches the full interactive TUI (requires `gum`) where you can browse PRs, read their body, and approve or merge with keyboard navigation.
 
 ## Skills
 
