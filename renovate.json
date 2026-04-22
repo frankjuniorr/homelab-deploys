@@ -101,6 +101,17 @@
       "registryUrlTemplate": "https://grafana.github.io/helm-charts"
     },
     {
+      "description": "CloudNativePG operator Helm chart version",
+      "customType": "regex",
+      "managerFilePatterns": [
+        "/^src/group_vars/all/vars\\.yml$/"
+      ],
+      "matchStrings": ["cnpg_version:\\s*\"(?<currentValue>[\\d.]+)\""],
+      "datasourceTemplate": "helm",
+      "depNameTemplate": "cloudnative-pg",
+      "registryUrlTemplate": "https://cloudnative-pg.github.io/charts"
+    },
+    {
       "description": "Prometheus node_exporter binary version (GitHub release)",
       "customType": "regex",
       "managerFilePatterns": [

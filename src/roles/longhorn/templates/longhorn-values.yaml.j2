@@ -1,5 +1,7 @@
 defaultSettings:
   defaultReplicaCount: {{ longhorn_default_replica_count }}
+  storageMinimalAvailablePercentage: {{ longhorn_min_available_pct | default(15) }}
+  storageOverProvisioningPercentage: {{ longhorn_over_provisioning_pct | default(200) }}
   backupTarget: "{{ longhorn_backup_target }}"
   backupTargetCredentialSecret: "{{ longhorn_backup_credential_secret }}"
   # Allow recurring backup jobs to run on detached volumes (e.g. stopped pods)

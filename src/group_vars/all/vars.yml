@@ -120,6 +120,8 @@ loki_lim_mem:          "128Mi"
 
 # Longhorn volumes (replica count across workers)
 longhorn_default_replica_count: 2
+longhorn_min_available_pct: 15
+longhorn_over_provisioning_pct: 200
 
 # Longhorn manager (per node — 3 nodes in cluster)
 longhorn_manager_req_cpu:  "50m"
@@ -133,6 +135,28 @@ longhorn_manager_lim_mem:  "200Mi"
 prometheus_storage_size:   "10Gi"
 loki_storage_size:         "10Gi"
 grafana_storage_size:      "1Gi"
+
+##############################################################
+# CloudNativePG + PostgreSQL
+##############################################################
+namespace_cnpg: cnpg-system
+namespace_postgres: postgres
+cnpg_version: "0.28.0"
+postgres_instances: 2
+postgres_storage_size: "10Gi"
+postgres_lb_ip: "192.168.1.201"
+
+# CloudNativePG operator resources
+cnpg_req_cpu: "50m"
+cnpg_req_mem: "128Mi"
+cnpg_lim_cpu: "200m"
+cnpg_lim_mem: "256Mi"
+
+# PostgreSQL pod resources (applied per instance)
+postgres_req_cpu: "100m"
+postgres_req_mem: "256Mi"
+postgres_lim_cpu: "500m"
+postgres_lim_mem: "512Mi"
 
 ##############################################################
 # Applications registry

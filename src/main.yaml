@@ -54,6 +54,12 @@
     - apps
 
   roles:
+    - role: postgres
+      tags:
+        - setup
+        - apps
+        - postgres
+
     - role: longhorn
       tags:
         - setup

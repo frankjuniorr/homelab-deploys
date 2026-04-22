@@ -1,0 +1,17 @@
+apiVersion: postgresql.cnpg.io/v1
+kind: Cluster
+metadata:
+  name: postgres
+  namespace: {{ namespace_postgres }}
+spec:
+  instances: {{ postgres_instances }}
+  storage:
+    storageClass: longhorn-2replicas
+    size: {{ postgres_storage_size }}
+  resources:
+    requests:
+      cpu: "{{ postgres_req_cpu }}"
+      memory: "{{ postgres_req_mem }}"
+    limits:
+      cpu: "{{ postgres_lim_cpu }}"
+      memory: "{{ postgres_lim_mem }}"

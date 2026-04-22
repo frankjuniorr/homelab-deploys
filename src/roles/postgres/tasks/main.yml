@@ -1,0 +1,74 @@
+---
+##############################################
+# POSTGRES ROLE
+# Deploys the CloudNativePG operator (cnpg-system) and a 2-instance
+# PostgreSQL cluster (1 primary + 1 replica) in the postgres namespace.
+#
+# External access: MetalLB LoadBalancer at postgres_lb_ip:5432 (primary only)
+# Storage: Longhorn PVC per instance (postgres_storage_size each)
+##############################################
+
+- name: "Add CloudNativePG Helm repo"
+  ansible.builtin.command:
+    cmd: helm repo add cnpg https://cloudnative-pg.github.io/charts --force-update
+  changed_when: false
+
+- name: "Update Helm repo cache"
+  ansible.builtin.command:
+    cmd: helm repo update
+  changed_when: false
+
+- name: "Install CloudNativePG operator"
+  ansible.builtin.command:
+    cmd: >
+      helm upgrade --install cnpg-system cloudnative-pg
+      --repo https://cloudnative-pg.github.io/charts
+      --namespace {{ namespace_cnpg }}
+      --create-namespace
+      --version {{ cnpg_version }}
+      --wait
+      --set resources.requests.cpu={{ cnpg_req_cpu }}
+      --set resources.requests.memory={{ cnpg_req_mem }}
+      --set resources.limits.cpu={{ cnpg_lim_cpu }}
+      --set resources.limits.memory={{ cnpg_lim_mem }}
+  register: helm_cnpg
+  changed_when: "'has been upgraded' in helm_cnpg.stdout or 'has been installed' in helm_cnpg.stdout"
+
+- name: "Wait for CloudNativePG Cluster CRD to be established"
+  kubernetes.core.k8s_info:
+    api_version: apiextensions.k8s.io/v1
+    kind: CustomResourceDefinition
+    name: clusters.postgresql.cnpg.io
+  register: cnpg_crd_check
+  until: >
+    cnpg_crd_check.resources | length > 0 and
+    (cnpg_crd_check.resources[0].status.conditions |
+      selectattr('type', 'eq', 'Established') |
+      selectattr('status', 'eq', 'True') | list | length > 0)
+  retries: 18
+  delay: 5
+
+- name: "Deploy postgres resources (namespace | cluster | service-lb)"
+  kubernetes.core.k8s:
+    state: present
+    definition: "{{ lookup('template', role_path + '/templates/' + item) | from_yaml }}"
+  loop:
+    - storageclass.yaml.j2
+    - namespace.yaml.j2
+    - cluster.yaml.j2
+    - service-lb.yaml.j2
+  loop_control:
+    label: "{{ item }}"
+
+- name: "Wait for PostgreSQL cluster to be ready"
+  kubernetes.core.k8s_info:
+    api_version: postgresql.cnpg.io/v1
+    kind: Cluster
+    name: postgres
+    namespace: "{{ namespace_postgres }}"
+  register: cluster_check
+  until: >
+    cluster_check.resources | length > 0 and
+    (cluster_check.resources[0].status.readyInstances | default(0) | int) == postgres_instances
+  retries: 90
+  delay: 10
