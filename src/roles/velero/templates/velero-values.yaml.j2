@@ -1,0 +1,63 @@
+image:
+  pullPolicy: IfNotPresent
+
+# Pin kubectl image to a version that exists (auto-detect uses cluster version which may be newer)
+kubectl:
+  image:
+    repository: docker.io/bitnamilegacy/kubectl
+    tag: "{{ velero_kubectl_image_tag }}"
+
+resources:
+  requests:
+    cpu: "50m"
+    memory: "128Mi"
+  limits:
+    cpu: "200m"
+    memory: "256Mi"
+
+# Kopia for file-system PVC backup — CSI snapshots not needed
+uploaderType: kopia
+snapshotsEnabled: false
+
+# AWS S3-compatible plugin (Garage)
+initContainers:
+  - name: velero-plugin-for-aws
+    image: velero/velero-plugin-for-aws:{{ velero_plugin_aws_version }}
+    imagePullPolicy: IfNotPresent
+    volumeMounts:
+      - mountPath: /target
+        name: plugins
+
+# Node agent DaemonSet required for file-system (Kopia) PVC backups
+nodeAgent:
+  enabled: true
+  podVolumePath: /var/lib/kubelet/pods
+
+# Reference pre-created credentials secret (credentials never appear in Helm values)
+credentials:
+  useSecret: true
+  existingSecret: velero-credentials
+
+configuration:
+  backupStorageLocation:
+    - name: default
+      provider: aws
+      bucket: "{{ velero_backup_bucket }}"
+      default: true
+      config:
+        region: "{{ velero_backup_region }}"
+        s3Url: "{{ garage_s3_endpoint }}"
+        s3ForcePathStyle: "true"
+
+# Daily backup schedule
+schedules:
+  homelab-daily:
+    disabled: false
+    schedule: "{{ velero_schedule_cron }}"
+    useOwnerReferencesInBackup: false
+    template:
+      storageLocation: default
+      ttl: "{{ velero_backup_ttl }}"
+      includedNamespaces:
+        - "*"
+      defaultVolumesToFsBackup: true

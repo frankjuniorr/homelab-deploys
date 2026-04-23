@@ -120,6 +120,37 @@
       "matchStrings": ["node_exporter_version:\\s*\"(?<currentValue>[\\d.]+)\""],
       "datasourceTemplate": "github-releases",
       "depNameTemplate": "prometheus/node_exporter"
+    },
+    {
+      "description": "Velero Helm chart version",
+      "customType": "regex",
+      "managerFilePatterns": [
+        "/^src/group_vars/all/vars\\.yml$/"
+      ],
+      "matchStrings": ["velero_version:\\s*\"(?<currentValue>[\\d.]+(?:\\.[\\d]+)*)\""],
+      "datasourceTemplate": "helm",
+      "depNameTemplate": "velero",
+      "registryUrlTemplate": "https://vmware-tanzu.github.io/helm-charts"
+    },
+    {
+      "description": "Velero AWS plugin image version (Docker)",
+      "customType": "regex",
+      "managerFilePatterns": [
+        "/^src/group_vars/all/vars\\.yml$/"
+      ],
+      "matchStrings": ["velero_plugin_aws_version:\\s*\"?(?<currentValue>v[\\d.]+)\"?"],
+      "datasourceTemplate": "docker",
+      "depNameTemplate": "velero/velero-plugin-for-aws"
+    },
+    {
+      "description": "PgAdmin4 Docker image version",
+      "customType": "regex",
+      "managerFilePatterns": [
+        "/^src/group_vars/all/vars\\.yml$/"
+      ],
+      "matchStrings": ["pgadmin_version:\\s*\"(?<currentValue>[\\d.]+)\""],
+      "datasourceTemplate": "docker",
+      "depNameTemplate": "dpage/pgadmin4"
     }
   ]
 }

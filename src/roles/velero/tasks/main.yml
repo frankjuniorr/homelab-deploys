@@ -1,0 +1,138 @@
+---
+##############################################
+# VELERO ROLE
+# Installs Velero for cluster backup/restore.
+# Backend: Garage S3 (s3://homelab-velero@homelab/)
+# Uploader: Kopia (file-system backup — no CSI snapshots needed)
+# Schedule: daily at 3 AM, 30-day retention
+#
+# First-deploy detection: if completed backups exist in S3 AND the grafana
+# namespace is absent, a restore is triggered automatically before apps deploy.
+#
+# Manual restore: just restore [backup-name]
+#
+# Vault entries required:
+#   vault_velero_backup_access_key
+#   vault_velero_backup_secret_key
+##############################################
+
+- name: "Ensure Velero namespace exists"
+  kubernetes.core.k8s:
+    state: present
+    definition:
+      apiVersion: v1
+      kind: Namespace
+      metadata:
+        name: "{{ velero_namespace }}"
+
+- name: "Apply Velero credentials secret"
+  kubernetes.core.k8s:
+    state: present
+    definition: "{{ lookup('template', role_path + '/templates/velero-credentials-secret.yaml.j2') | from_yaml }}"
+
+- name: "Add Velero Helm repo"
+  ansible.builtin.command:
+    cmd: helm repo add vmware-tanzu https://vmware-tanzu.github.io/helm-charts --force-update
+  changed_when: false
+
+- name: "Update Helm repo cache"
+  ansible.builtin.command:
+    cmd: helm repo update
+  changed_when: false
+
+- name: "Write Velero Helm values to temp file"
+  ansible.builtin.template:
+    src: velero-values.yaml.j2
+    dest: /tmp/velero-values.yaml
+    mode: "0600"
+
+- name: "Install Velero"
+  ansible.builtin.command:
+    cmd: >
+      helm upgrade --install velero vmware-tanzu/velero
+      --namespace {{ velero_namespace }}
+      --create-namespace
+      --version {{ velero_version }}
+      --wait
+      --timeout 15m0s
+      --values /tmp/velero-values.yaml
+  register: helm_velero
+  changed_when: "'has been upgraded' in helm_velero.stdout or 'has been installed' in helm_velero.stdout"
+
+- name: "Remove temporary Helm values file"
+  ansible.builtin.file:
+    path: /tmp/velero-values.yaml
+    state: absent
+
+##############################################
+# First-deploy restore detection
+# Conditions: completed backups exist AND grafana namespace is absent
+##############################################
+
+- name: "Check for completed Velero backups in BSL"
+  ansible.builtin.shell:
+    cmd: >
+      kubectl get backup.velero.io -n {{ velero_namespace }} -o json 2>/dev/null |
+      jq -r '[.items[] | select(.status.phase == "Completed")] | length'
+  register: velero_backup_count
+  changed_when: false
+  failed_when: false
+
+- name: "Check if app namespaces already exist"
+  kubernetes.core.k8s_info:
+    api_version: v1
+    kind: Namespace
+    name: grafana
+  register: grafana_ns_check
+
+- name: "Set first-deploy restore flag"
+  ansible.builtin.set_fact:
+    velero_first_deploy: >-
+      {{ (velero_backup_count.rc == 0) and
+         ((velero_backup_count.stdout | trim | int) > 0) and
+         (grafana_ns_check.resources | length == 0) }}
+
+- name: "Get latest completed backup name"
+  ansible.builtin.shell:
+    cmd: >
+      kubectl get backup.velero.io -n {{ velero_namespace }} -o json |
+      jq -r '[.items[] | select(.status.phase == "Completed")] |
+             sort_by(.metadata.creationTimestamp) | last | .metadata.name'
+  register: velero_latest_backup
+  changed_when: false
+  when: velero_first_deploy | bool
+
+- name: "Apply Velero Restore CR (first deploy detected)"
+  kubernetes.core.k8s:
+    state: present
+    definition:
+      apiVersion: velero.io/v1
+      kind: Restore
+      metadata:
+        name: first-deploy-restore
+        namespace: "{{ velero_namespace }}"
+      spec:
+        backupName: "{{ velero_latest_backup.stdout | trim }}"
+        includedNamespaces:
+          - "*"
+        restorePVs: true
+  when: velero_first_deploy | bool
+
+- name: "Wait for first-deploy restore to complete"
+  kubernetes.core.k8s_info:
+    api_version: velero.io/v1
+    kind: Restore
+    name: first-deploy-restore
+    namespace: "{{ velero_namespace }}"
+  register: restore_status
+  until: restore_status.resources | length > 0 and
+         restore_status.resources[0].status.phase in ['Completed', 'PartiallyFailed', 'Failed']
+  retries: 60
+  delay: 30
+  when: velero_first_deploy | bool
+
+- name: "Assert first-deploy restore completed successfully"
+  ansible.builtin.assert:
+    that: restore_status.resources[0].status.phase == 'Completed'
+    fail_msg: "Velero restore ended with status: {{ restore_status.resources[0].status.phase }}"
+  when: velero_first_deploy | bool

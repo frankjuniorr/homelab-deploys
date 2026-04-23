@@ -54,17 +54,24 @@
     - apps
 
   roles:
-    - role: postgres
-      tags:
-        - setup
-        - apps
-        - postgres
-
     - role: longhorn
       tags:
         - setup
         - apps
         - longhorn
+
+    - role: velero
+      tags:
+        - setup
+        - apps
+        - velero
+
+    - role: postgres
+      tags:
+        - setup
+        - apps
+        - postgres
+        - pgadmin
 
     - role: podinfo
       tags:

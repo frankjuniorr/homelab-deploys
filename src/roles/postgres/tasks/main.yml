@@ -72,3 +72,16 @@
     (cluster_check.resources[0].status.readyInstances | default(0) | int) == postgres_instances
   retries: 90
   delay: 10
+
+- name: "Deploy PgAdmin4 resources (secret | pvc | deployment | service | httproute)"
+  kubernetes.core.k8s:
+    state: present
+    definition: "{{ lookup('template', role_path + '/templates/' + item) | from_yaml }}"
+  loop:
+    - pgadmin-secret.yaml.j2
+    - pgadmin-pvc.yaml.j2
+    - pgadmin-deployment.yaml.j2
+    - pgadmin-service.yaml.j2
+    - pgadmin-httproute.yaml.j2
+  loop_control:
+    label: "{{ item }}"

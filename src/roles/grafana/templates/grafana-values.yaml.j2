@@ -1,5 +1,9 @@
 adminPassword: "{{ grafana_admin_password }}"
 
+# Recreate strategy required: PVC is ReadWriteOnce — rolling update causes volume contention
+deploymentStrategy:
+  type: Recreate
+
 persistence:
   enabled: true
   storageClassName: longhorn
