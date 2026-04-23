@@ -191,7 +191,7 @@ pgadmin_lim_mem: "512Mi"
 ##############################################################
 # Linkding (bookmark manager)
 ##############################################################
-linkding_version: "1.36.0"
+linkding_version: "1.45.0"
 linkding_domain: "linkding.{{ homelab_domain }}"
 linkding_storage_size: "1Gi"
 linkding_req_cpu: "50m"
