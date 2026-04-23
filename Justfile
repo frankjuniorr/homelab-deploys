@@ -81,6 +81,30 @@ secrets-view:
     @ansible-vault view src/group_vars/all/vault.yml --vault-password-file {{VAULT_PASS_FILE}}
 
 ############################################################################
+# VELERO BACKUP / RESTORE
+############################################################################
+# Backup manual: dispara um backup imediato sem esperar pelo schedule
+# Uso: just backup            (nome automático: manual-backup-YYYYMMDD-HHMMSS)
+#      just backup NOME       (nome customizado)
+backup name="":
+    @if [ -n "{{name}}" ]; then \
+        ./scripts/velero-backup.sh "{{name}}"; \
+    else \
+        ./scripts/velero-backup.sh; \
+    fi
+
+# Restore manual: recupera dados do último backup completo no S3
+# Uso: just restore            (usa o backup mais recente)
+#      just restore NOME       (usa um backup específico pelo nome)
+# Pré-requisito: criar o bucket homelab-velero no Garage via aws-cli antes do primeiro deploy
+restore backup="":
+    @if [ -n "{{backup}}" ]; then \
+        ./scripts/velero-restore.sh "{{backup}}"; \
+    else \
+        ./scripts/velero-restore.sh; \
+    fi
+
+############################################################################
 # PR REVIEW
 ############################################################################
 # Lista PRs abertos e permite aprovar/mergear interativamente (requer gum)
