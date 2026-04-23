@@ -26,9 +26,10 @@ init: install-hooks
 ############################################################################
 # DEPLOY
 ############################################################################
-# Deploy completo: cluster-setup (namespaces + CRDs + Helm + configs + CA trust) + apps
-deploy: init
-    @cd src && {{ansible_cmd}} main.yaml --tags "setup"
+# Deploy completo por padrão; passa uma tag para rodar apenas aquele subset
+# Exemplos: just deploy | just deploy pgadmin | just deploy velero | just deploy infra
+deploy tag="setup": init
+    @cd src && {{ansible_cmd}} main.yaml --tags "{{tag}}"
 
 # Deploy apenas a infraestrutura do cluster (sem apps)
 deploy-infra:

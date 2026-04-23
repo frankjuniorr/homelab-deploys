@@ -180,7 +180,7 @@ postgres_lim_mem: "512Mi"
 ##############################################################
 # PgAdmin4 (deployed in postgres namespace as a frontend for CloudNativePG)
 ##############################################################
-pgadmin_version: "9.3"
+pgadmin_version: "9.14"
 pgadmin_domain: "pgadmin.{{ homelab_domain }}"
 pgadmin_storage_size: "512Mi"
 pgadmin_req_cpu: "50m"
