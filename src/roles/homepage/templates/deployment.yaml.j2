@@ -1,0 +1,60 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: {{ app.name }}
+  namespace: {{ app.namespace }}
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: {{ app.name }}
+  template:
+    metadata:
+      labels:
+        app: {{ app.name }}
+    spec:
+      initContainers:
+        - name: copy-config
+          image: busybox:1.36
+          command: ["sh", "-c", "cp /config-source/* /app/config/"]
+          volumeMounts:
+            - name: config-source
+              mountPath: /config-source
+            - name: config-writable
+              mountPath: /app/config
+      containers:
+        - name: {{ app.name }}
+          image: ghcr.io/gethomepage/homepage:{{ homepage_version }}
+          imagePullPolicy: IfNotPresent
+          ports:
+            - containerPort: 3000
+          resources:
+            requests:
+              cpu: "{{ homepage_req_cpu }}"
+              memory: "{{ homepage_req_mem }}"
+            limits:
+              cpu: "{{ homepage_lim_cpu }}"
+              memory: "{{ homepage_lim_mem }}"
+          readinessProbe:
+            httpGet:
+              path: /
+              port: 3000
+            initialDelaySeconds: 10
+            periodSeconds: 5
+            failureThreshold: 6
+          livenessProbe:
+            httpGet:
+              path: /
+              port: 3000
+            initialDelaySeconds: 20
+            periodSeconds: 10
+            failureThreshold: 3
+          volumeMounts:
+            - name: config-writable
+              mountPath: /app/config
+      volumes:
+        - name: config-source
+          configMap:
+            name: homepage-config
+        - name: config-writable
+          emptyDir: {}

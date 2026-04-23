@@ -1,0 +1,31 @@
+- Monitoramento:
+    - Grafana:
+        href: "https://{{ monitoring_grafana_domain }}"
+        description: Dashboards de métricas
+        icon: grafana.svg
+    - Prometheus:
+        href: "https://{{ monitoring_prometheus_domain }}"
+        description: Coleta de métricas
+        icon: prometheus.svg
+
+- Infraestrutura:
+    - Longhorn:
+        href: "https://{{ longhorn_domain }}"
+        description: Armazenamento distribuído
+        icon: longhorn.svg
+    - PgAdmin:
+        href: "https://{{ pgadmin_domain }}"
+        description: Gerenciamento PostgreSQL
+        icon: postgres.svg
+
+- Aplicações:
+    - Linkding:
+        href: "https://{{ linkding_domain }}"
+        description: Gerenciador de bookmarks
+        icon: linkding.svg
+
+- Rede:
+    - AdGuard Home:
+        href: "http://192.168.1.51/login.html"
+        description: Bloqueador de anúncios DNS
+        icon: adguard-home.svg

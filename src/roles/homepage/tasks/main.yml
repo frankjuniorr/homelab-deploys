@@ -1,0 +1,25 @@
+---
+##############################################
+# HOMEPAGE ROLE
+# Deploys the Homepage dashboard with static configuration via ConfigMap.
+# Each Homepage config file (settings, services, widgets, etc.) lives in its own
+# template under templates/config-*.yaml.j2 and is assembled into the ConfigMap
+# by configmap.yaml.j2 using lookup('template', ...).
+##############################################
+
+- name: "Load app configuration from apps registry (group_vars/all.yml)"
+  ansible.builtin.set_fact:
+    app: "{{ apps | selectattr('name', 'eq', 'homepage') | first }}"
+
+- name: "Deploy homepage resources (namespace | configmap | deployment | service | httproute)"
+  kubernetes.core.k8s:
+    state: present
+    definition: "{{ lookup('template', role_path + '/templates/' + item) | from_yaml_all | list }}"
+  loop:
+    - namespace.yaml.j2
+    - configmap.yaml.j2
+    - deployment.yaml.j2
+    - service.yaml.j2
+    - httproute.yaml.j2
+  loop_control:
+    label: "{{ item }}"

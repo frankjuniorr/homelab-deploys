@@ -90,3 +90,15 @@
         - setup
         - apps
         - grafana
+
+    - role: linkding
+      tags:
+        - setup
+        - apps
+        - linkding
+
+    - role: homepage
+      tags:
+        - setup
+        - apps
+        - homepage

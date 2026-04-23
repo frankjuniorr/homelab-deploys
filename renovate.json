@@ -151,6 +151,26 @@
       "matchStrings": ["pgadmin_version:\\s*\"(?<currentValue>[\\d.]+)\""],
       "datasourceTemplate": "docker",
       "depNameTemplate": "dpage/pgadmin4"
+    },
+    {
+      "description": "Linkding Docker image version",
+      "customType": "regex",
+      "managerFilePatterns": [
+        "/^src/group_vars/all/vars\\.yml$/"
+      ],
+      "matchStrings": ["linkding_version:\\s*\"(?<currentValue>[\\d.]+)\""],
+      "datasourceTemplate": "docker",
+      "depNameTemplate": "sissbruecker/linkding"
+    },
+    {
+      "description": "Homepage Docker image version (GitHub releases)",
+      "customType": "regex",
+      "managerFilePatterns": [
+        "/^src/group_vars/all/vars\\.yml$/"
+      ],
+      "matchStrings": ["homepage_version:\\s*\"(?<currentValue>v[\\d.]+)\""],
+      "datasourceTemplate": "github-releases",
+      "depNameTemplate": "gethomepage/homepage"
     }
   ]
 }

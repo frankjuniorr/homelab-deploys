@@ -1,0 +1,45 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: {{ app.name }}
+  namespace: {{ app.namespace }}
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: {{ app.name }}
+  template:
+    metadata:
+      labels:
+        app: {{ app.name }}
+    spec:
+      containers:
+        - name: {{ app.name }}
+          image: sissbruecker/linkding:{{ linkding_version }}
+          imagePullPolicy: IfNotPresent
+          ports:
+            - containerPort: 9090
+          envFrom:
+            - secretRef:
+                name: linkding-env
+          resources:
+            requests:
+              cpu: "{{ linkding_req_cpu }}"
+              memory: "{{ linkding_req_mem }}"
+            limits:
+              cpu: "{{ linkding_lim_cpu }}"
+              memory: "{{ linkding_lim_mem }}"
+          readinessProbe:
+            httpGet:
+              path: /
+              port: 9090
+            initialDelaySeconds: 15
+            periodSeconds: 5
+            failureThreshold: 6
+          livenessProbe:
+            httpGet:
+              path: /
+              port: 9090
+            initialDelaySeconds: 30
+            periodSeconds: 10
+            failureThreshold: 3

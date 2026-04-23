@@ -189,6 +189,27 @@ pgadmin_lim_cpu: "200m"
 pgadmin_lim_mem: "512Mi"
 
 ##############################################################
+# Linkding (bookmark manager)
+##############################################################
+linkding_version: "1.36.0"
+linkding_domain: "linkding.{{ homelab_domain }}"
+linkding_storage_size: "1Gi"
+linkding_req_cpu: "50m"
+linkding_req_mem: "128Mi"
+linkding_lim_cpu: "200m"
+linkding_lim_mem: "256Mi"
+
+##############################################################
+# Homepage (homelab dashboard)
+##############################################################
+homepage_version: "v0.10.9"
+homepage_domain: "home.{{ homelab_domain }}"
+homepage_req_cpu: "50m"
+homepage_req_mem: "128Mi"
+homepage_lim_cpu: "200m"
+homepage_lim_mem: "256Mi"
+
+##############################################################
 # Applications registry
 ##############################################################
 # Each entry drives the role of the same name: role name = namespace name = app name.
@@ -197,3 +218,9 @@ apps:
   - name: podinfo
     namespace: podinfo
     domain: hello.{{ homelab_domain }}
+  - name: linkding
+    namespace: linkding
+    domain: "{{ linkding_domain }}"
+  - name: homepage
+    namespace: homepage
+    domain: "{{ homepage_domain }}"

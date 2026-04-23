@@ -1,0 +1,42 @@
+---
+##############################################
+# LINKDING ROLE
+# Deploys the Linkding bookmark manager using the existing CloudNativePG cluster.
+# Creates a dedicated 'linkding' database (CNPG Database CR, owner: app).
+# DB credentials are pulled at deploy time from the 'postgres-app' secret (CNPG-managed).
+# App secrets (LD_SECRET_KEY, superuser) come from vault.yml.
+##############################################
+
+- name: "Load app configuration from apps registry (group_vars/all.yml)"
+  ansible.builtin.set_fact:
+    app: "{{ apps | selectattr('name', 'eq', 'linkding') | first }}"
+
+- name: "Read postgres-app credentials from postgres namespace"
+  kubernetes.core.k8s_info:
+    api_version: v1
+    kind: Secret
+    name: postgres-app
+    namespace: "{{ namespace_postgres }}"
+  register: postgres_app_secret
+  until: postgres_app_secret.resources | length > 0
+  retries: 12
+  delay: 5
+
+- name: "Extract postgres app user credentials"
+  ansible.builtin.set_fact:
+    linkding_db_user: "{{ postgres_app_secret.resources[0].data.username | b64decode }}"
+    linkding_db_password: "{{ postgres_app_secret.resources[0].data.password | b64decode }}"
+
+- name: "Deploy linkding resources (namespace | database | secret | deployment | service | httproute)"
+  kubernetes.core.k8s:
+    state: present
+    definition: "{{ lookup('template', role_path + '/templates/' + item) | from_yaml_all | list }}"
+  loop:
+    - namespace.yaml.j2
+    - database.yaml.j2
+    - secret.yaml.j2
+    - deployment.yaml.j2
+    - service.yaml.j2
+    - httproute.yaml.j2
+  loop_control:
+    label: "{{ item }}"
