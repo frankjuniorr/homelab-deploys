@@ -66,15 +66,30 @@
 
 ##############################################
 # First-deploy restore detection
-# Conditions: completed backups exist AND grafana namespace is absent
+# Strategy: check S3 bucket directly (immediate) — avoids depending on
+# Velero's ~1 min CR sync cycle. If bucket has content AND grafana
+# namespace is absent, trigger restore from the latest completed backup.
 ##############################################
 
-- name: "Check for completed Velero backups in BSL"
+- name: "Wait for Velero BackupStorageLocation to become Available"
+  kubernetes.core.k8s_info:
+    api_version: velero.io/v1
+    kind: BackupStorageLocation
+    name: default
+    namespace: "{{ velero_namespace }}"
+  register: bsl_check
+  until: >
+    bsl_check.resources | length > 0 and
+    bsl_check.resources[0].status.phase | default('') == 'Available'
+  retries: 24
+  delay: 5
+
+- name: "Check S3 bucket for existing Velero backups"
   ansible.builtin.shell:
     cmd: >
-      kubectl get backup.velero.io -n {{ velero_namespace }} -o json 2>/dev/null |
-      jq -r '[.items[] | select(.status.phase == "Completed")] | length'
-  register: velero_backup_count
+      aws s3 ls s3://{{ velero_backup_bucket }}/
+      --endpoint-url {{ garage_s3_endpoint }} 2>/dev/null | grep -c '^' || echo 0
+  register: s3_backup_count
   changed_when: false
   failed_when: false
 
@@ -88,9 +103,21 @@
 - name: "Set first-deploy restore flag"
   ansible.builtin.set_fact:
     velero_first_deploy: >-
-      {{ (velero_backup_count.rc == 0) and
-         ((velero_backup_count.stdout | trim | int) > 0) and
+      {{ (s3_backup_count.rc == 0) and
+         ((s3_backup_count.stdout | trim | int) > 0) and
          (grafana_ns_check.resources | length == 0) }}
+
+- name: "Wait for Velero to sync completed backups from BSL"
+  ansible.builtin.shell:
+    cmd: >
+      kubectl get backup.velero.io -n {{ velero_namespace }} -o json 2>/dev/null |
+      jq -r '[.items[] | select(.status.phase == "Completed")] | length'
+  register: velero_backup_count
+  until: (velero_backup_count.stdout | trim | int) > 0
+  retries: 24
+  delay: 10
+  changed_when: false
+  when: velero_first_deploy | bool
 
 - name: "Get latest completed backup name"
   ansible.builtin.shell:

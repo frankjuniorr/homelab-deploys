@@ -8,10 +8,13 @@ set -euo pipefail
 VELERO_NS="velero"
 BACKUP_NAME="${1:-manual-backup-$(date +%Y%m%d-%H%M%S)}"
 
-echo "Triggering Velero backup: $BACKUP_NAME"
+echo "Backup name: $BACKUP_NAME"
 echo ""
 
-kubectl apply -f - <<EOF
+if kubectl get "backup.velero.io/$BACKUP_NAME" -n "$VELERO_NS" &>/dev/null; then
+  echo "Backup '$BACKUP_NAME' already exists. Monitoring its status..."
+else
+  kubectl apply -f - <<EOF
 apiVersion: velero.io/v1
 kind: Backup
 metadata:
@@ -23,14 +26,32 @@ spec:
   storageLocation: default
   ttl: 720h0m0s
 EOF
+fi
 
 echo "Waiting for backup to complete (timeout: 30m)..."
-kubectl wait "backup.velero.io/$BACKUP_NAME" \
-  -n "$VELERO_NS" \
-  --for=jsonpath='{.status.phase}'=Completed \
-  --timeout=30m
+DEADLINE=$((SECONDS + 1800))
+while [ $SECONDS -lt $DEADLINE ]; do
+  PHASE=$(kubectl get "backup.velero.io/$BACKUP_NAME" -n "$VELERO_NS" \
+    -o jsonpath='{.status.phase}' 2>/dev/null || echo "")
+  case "$PHASE" in
+    Completed)
+      echo ""
+      echo "Backup completed: $BACKUP_NAME"
+      kubectl get "backup.velero.io/$BACKUP_NAME" -n "$VELERO_NS" \
+        -o jsonpath='{.status}' | jq .
+      exit 0
+      ;;
+    Failed|PartiallyFailed)
+      echo ""
+      echo "Backup ended with status: $PHASE"
+      kubectl get "backup.velero.io/$BACKUP_NAME" -n "$VELERO_NS" \
+        -o jsonpath='{.status}' | jq .
+      exit 1
+      ;;
+  esac
+  echo "  Status: ${PHASE:-Pending}..."
+  sleep 15
+done
 
-echo ""
-echo "Backup completed: $BACKUP_NAME"
-kubectl get "backup.velero.io/$BACKUP_NAME" -n "$VELERO_NS" \
-  -o jsonpath='{.status}' | jq .
+echo "Timeout waiting for backup to complete."
+exit 1

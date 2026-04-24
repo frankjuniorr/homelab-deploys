@@ -7,6 +7,14 @@
 #
 # Usage: just destroy
 # WARNING: This is irreversible. Run `just deploy` to restore the full stack.
+#
+# Pre-cleanup order (learned from stuck-namespace troubleshooting):
+# 1. Delete operator webhooks (Longhorn + CNPG) — they block CR deletion after operator is gone
+# 2. Strip finalizers from Longhorn CRs — controller is gone and can't process them
+# 3. Strip finalizers from CNPG Database CRs — same reason
+# 4. Strip PVC protection finalizers — pods are gone but finalizer still blocks deletion
+# 5. Delete all namespaces
+# 6. Wait until all namespaces are fully terminated (safe for subsequent `just deploy`)
 ##############################################
 
 - name: "Uninstall node_exporter from Proxmox host"
@@ -66,21 +74,134 @@
   become: false
 
   tasks:
-    - name: "Delete homelab namespaces"
+    - name: "Build complete namespace list"
+      ansible.builtin.set_fact:
+        all_namespaces: >-
+          {{ (apps | map(attribute='namespace') | list) + [
+               namespace_postgres, namespace_cnpg,
+               namespace_prometheus, namespace_grafana, namespace_loki,
+               longhorn_namespace, namespace_gateway,
+               namespace_cert_manager, namespace_metallb,
+               namespace_envoy, velero_namespace
+             ] }}
+
+    - name: "Remove operator webhook configurations (Longhorn + CNPG)"
+      kubernetes.core.k8s:
+        state: absent
+        api_version: admissionregistration.k8s.io/v1
+        kind: "{{ item.kind }}"
+        name: "{{ item.name }}"
+      loop:
+        - {kind: ValidatingWebhookConfiguration, name: longhorn-webhook-validator}
+        - {kind: MutatingWebhookConfiguration,   name: longhorn-webhook-mutator}
+        - {kind: ValidatingWebhookConfiguration, name: cnpg-validating-webhook-configuration}
+        - {kind: MutatingWebhookConfiguration,   name: cnpg-mutating-webhook-configuration}
+      loop_control:
+        label: "{{ item.name }}"
+      failed_when: false
+
+    - name: "Remove finalizers from Longhorn CRs"
+      ansible.builtin.shell:
+        cmd: |
+          kubectl get crd --no-headers 2>/dev/null | awk '{print $1}' \
+            | grep '\.longhorn\.io$' | while read crd; do
+            kubectl get "$crd" -n {{ longhorn_namespace }} -o name 2>/dev/null \
+              | xargs -r -I{} kubectl patch {} -n {{ longhorn_namespace }} \
+                -p '{"metadata":{"finalizers":[]}}' --type=merge 2>/dev/null
+          done
+      changed_when: false
+      failed_when: false
+
+    - name: "Remove finalizers from CNPG Database CRs"
+      ansible.builtin.shell:
+        cmd: |
+          kubectl get databases.postgresql.cnpg.io -n {{ namespace_postgres }} -o name 2>/dev/null \
+            | xargs -r -I{} kubectl patch {} -n {{ namespace_postgres }} \
+              --type=json -p='[{"op":"remove","path":"/metadata/finalizers"}]' 2>/dev/null
+      changed_when: false
+      failed_when: false
+
+    - name: "Remove PVC protection finalizers from all homelab namespaces"
+      ansible.builtin.shell:
+        cmd: |
+          for ns in {{ all_namespaces | join(' ') }}; do
+            kubectl get pvc -n "$ns" -o name 2>/dev/null \
+              | xargs -r -I{} kubectl patch {} -n "$ns" \
+                -p '{"metadata":{"finalizers":[]}}' --type=merge 2>/dev/null
+          done
+      changed_when: false
+      failed_when: false
+
+    - name: "Delete application namespaces"
+      kubernetes.core.k8s:
+        state: absent
+        api_version: v1
+        kind: Namespace
+        name: "{{ item }}"
+      loop: "{{ apps | map(attribute='namespace') | list }}"
+      loop_control:
+        label: "{{ item }}"
+
+    - name: "Delete infrastructure namespaces"
       kubernetes.core.k8s:
         state: absent
         api_version: v1
         kind: Namespace
         name: "{{ item }}"
       loop:
-        - prometheus
-        - grafana
-        - loki
-        - podinfo
-        - gateway
-        - cert-manager
-        - metallb-system
-        - envoy-gateway-system
-        - longhorn-system
+        - "{{ namespace_postgres }}"
+        - "{{ namespace_cnpg }}"
+        - "{{ namespace_prometheus }}"
+        - "{{ namespace_grafana }}"
+        - "{{ namespace_loki }}"
+        - "{{ longhorn_namespace }}"
+        - "{{ namespace_gateway }}"
+        - "{{ namespace_cert_manager }}"
+        - "{{ namespace_metallb }}"
+        - "{{ namespace_envoy }}"
+        - "{{ velero_namespace }}"
       loop_control:
         label: "{{ item }}"
+
+    - name: "Force-delete terminal pods blocking namespace termination"
+      ansible.builtin.shell:
+        cmd: |
+          for ns in {{ all_namespaces | join(' ') }}; do
+            kubectl get pods -n "$ns" \
+              --field-selector='status.phase=Succeeded' -o name 2>/dev/null \
+              | xargs -r kubectl delete --force --grace-period=0 -n "$ns" 2>/dev/null
+            kubectl get pods -n "$ns" \
+              --field-selector='status.phase=Failed' -o name 2>/dev/null \
+              | xargs -r kubectl delete --force --grace-period=0 -n "$ns" 2>/dev/null
+          done
+      changed_when: false
+      failed_when: false
+
+    - name: "Wait for all namespaces to fully terminate"
+      kubernetes.core.k8s_info:
+        api_version: v1
+        kind: Namespace
+        name: "{{ item }}"
+      register: ns_check
+      until: ns_check.resources | length == 0
+      retries: 60
+      delay: 10
+      loop: "{{ all_namespaces }}"
+      loop_control:
+        label: "{{ item }}"
+
+    - name: "Delete Longhorn CRDs (stale webhookClientConfig causes re-install to fail)"
+      ansible.builtin.shell:
+        cmd: |
+          kubectl get crd -o name 2>/dev/null | grep '\.longhorn\.io' \
+            | xargs -r kubectl delete 2>/dev/null
+      changed_when: false
+      failed_when: false
+
+    - name: "Delete CNPG CRDs (stale webhookClientConfig causes re-install to fail)"
+      ansible.builtin.shell:
+        cmd: |
+          kubectl get crd -o name 2>/dev/null | grep '\.cnpg\.io\|\.postgresql\.cnpg\.io' \
+            | xargs -r kubectl delete 2>/dev/null
+      changed_when: false
+      failed_when: false

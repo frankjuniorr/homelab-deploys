@@ -4,7 +4,6 @@
   <img src="https://img.shields.io/badge/Kubernetes-326CE5.svg?style=for-the-badge&logo=kubernetes&logoColor=white" alt="Kubernetes"/>
   <img src="https://img.shields.io/badge/K3s-FFC61C.svg?style=for-the-badge&logo=kubernetes&logoColor=white" alt="K3s"/>
   <img src="https://img.shields.io/badge/Ansible-black.svg?style=for-the-badge&logo=ansible&logoColor=white" alt="Ansible"/>
-  <img src="https://img.shields.io/badge/Velero-blue.svg?style=for-the-badge" alt="Velero"/>
 </p>
 
 The **software/workload layer** of a personal K3s homelab. While [`homelab-iac`](../homelab-iac/) provisions the raw infrastructure (Proxmox VMs, K3s cluster), this repo configures everything that runs on top of it: networking, TLS, observability, storage, backup/DR, and applications — all driven by Ansible.

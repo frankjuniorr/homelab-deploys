@@ -45,7 +45,7 @@
     src: "{{ ca_cert_local_path }}"
     dest: /etc/ca-certificates/trust-source/anchors/homelab-root-ca.crt
     mode: "0644"
-  when: ansible_distribution == "Archlinux"
+  when: ansible_facts['distribution'] == "Archlinux"
   notify: update-ca-trust-arch
 
 - name: "Install Root CA into Ubuntu/Debian system trust store"
@@ -56,7 +56,7 @@
     src: "{{ ca_cert_local_path }}"
     dest: /usr/local/share/ca-certificates/homelab-root-ca.crt
     mode: "0644"
-  when: ansible_distribution in ["Ubuntu", "Debian"]
+  when: ansible_facts['distribution'] in ["Ubuntu", "Debian"]
   notify: update-ca-trust-debian
 
 # --- Browser NSS database injection (Chrome / Firefox) ---
@@ -74,7 +74,7 @@
   # Chrome and Firefox each keep one or more NSS databases (cert9.db).
   # We inject into every database found so all browser profiles trust the CA.
   ansible.builtin.find:
-    paths: "{{ ansible_env.HOME }}"
+    paths: "{{ ansible_facts['env']['HOME'] }}"
     patterns: "cert9.db"
     recurse: true
   register: nss_databases

@@ -223,6 +223,15 @@ Whenever a version variable is added or modified in `src/group_vars/all/vars.yml
 
 Whenever a structural change is made to the project — new role, new `just` command, changed prerequisites, updated project layout, or new secrets workflow — **review and update `README.md`** to keep it in sync. The README is the public-facing entry point and must always reflect the actual state of the codebase.
 
+## Destroy Maintenance
+
+Whenever the deploy changes — new role, new namespace, or new operator (Helm chart that registers webhooks/CRDs with finalizers) — **review and update `src/destroy.yaml`** to keep it in sync. Specifically check:
+
+1. **`all_namespaces` list** — every namespace created by `just deploy` must be listed so it gets deleted and waited on
+2. **Webhook pre-cleanup** — if the new operator registers a `ValidatingWebhookConfiguration` or `MutatingWebhookConfiguration`, add it to the "Remove operator webhook configurations" task; otherwise its CRs will be stuck in Terminating after the operator is gone
+3. **Finalizer-strip tasks** — if the new operator's CRs carry finalizers that only the controller can process (e.g., Longhorn's `longhorn.io`, CNPG's `cnpg.io/deleteDatabase`), add a shell task to patch those finalizers to `[]` before namespace deletion
+4. **CRD cleanup** — if the operator's CRDs embed `webhookClientConfig` (Longhorn, CNPG do), add a shell task to delete those CRDs by label/suffix; stale CRDs cause `helm upgrade --install` to fail on the next deploy
+
 ## Session Start — Renovate PR Triage
 
 When the session starts and the context contains `RENOVATE_PRS_PENDING`, perform this triage automatically (no need to ask the user):

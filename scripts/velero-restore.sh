@@ -10,6 +10,12 @@ RESTORE_NAME="manual-restore-$(date +%Y%m%d-%H%M%S)"
 
 if [ -n "${1:-}" ]; then
   BACKUP_NAME="$1"
+  BACKUP_PHASE=$(kubectl get "backup.velero.io/$BACKUP_NAME" -n "$VELERO_NS" \
+    -o jsonpath='{.status.phase}' 2>/dev/null || echo "")
+  if [ "$BACKUP_PHASE" != "Completed" ]; then
+    echo "Backup '$BACKUP_NAME' not found or not Completed (phase: ${BACKUP_PHASE:-not found})."
+    exit 1
+  fi
 else
   echo "Fetching latest completed Velero backup..."
   BACKUP_NAME=$(kubectl get backup.velero.io -n "$VELERO_NS" -o json \
@@ -35,16 +41,35 @@ spec:
   backupName: $BACKUP_NAME
   includedNamespaces:
     - "*"
+  excludedNamespaces:
+    - velero
   restorePVs: true
 EOF
 
 echo "Waiting for restore to complete (timeout: 30m)..."
-kubectl wait "restore.velero.io/$RESTORE_NAME" \
-  -n "$VELERO_NS" \
-  --for=jsonpath='{.status.phase}'=Completed \
-  --timeout=30m
+DEADLINE=$((SECONDS + 1800))
+while [ $SECONDS -lt $DEADLINE ]; do
+  PHASE=$(kubectl get "restore.velero.io/$RESTORE_NAME" -n "$VELERO_NS" \
+    -o jsonpath='{.status.phase}' 2>/dev/null || echo "")
+  case "$PHASE" in
+    Completed)
+      echo ""
+      echo "Restore completed: $RESTORE_NAME"
+      kubectl get "restore.velero.io/$RESTORE_NAME" -n "$VELERO_NS" \
+        -o jsonpath='{.status}' | jq .
+      exit 0
+      ;;
+    PartiallyFailed|Failed)
+      echo ""
+      echo "Restore ended with status: $PHASE"
+      kubectl get "restore.velero.io/$RESTORE_NAME" -n "$VELERO_NS" \
+        -o jsonpath='{.status}' | jq .
+      exit 1
+      ;;
+  esac
+  echo "  Status: ${PHASE:-Pending}..."
+  sleep 15
+done
 
-echo ""
-echo "Restore completed: $RESTORE_NAME"
-kubectl get "restore.velero.io/$RESTORE_NAME" -n "$VELERO_NS" \
-  -o jsonpath='{.status}' | jq .
+echo "Timeout waiting for restore to complete."
+exit 1
