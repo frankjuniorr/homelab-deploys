@@ -1,12 +1,6 @@
 image:
   pullPolicy: IfNotPresent
 
-# Pin kubectl image to a version that exists (auto-detect uses cluster version which may be newer)
-kubectl:
-  image:
-    repository: docker.io/bitnamilegacy/kubectl
-    tag: "{{ velero_kubectl_image_tag }}"
-
 resources:
   requests:
     cpu: "50m"
@@ -29,8 +23,10 @@ initContainers:
         name: plugins
 
 # Node agent DaemonSet required for file-system (Kopia) PVC backups
+# Note: top-level 'deployNodeAgent' is the toggle in chart 10.x (not nodeAgent.enabled)
+deployNodeAgent: true
+
 nodeAgent:
-  enabled: true
   podVolumePath: /var/lib/kubelet/pods
 
 # Reference pre-created credentials secret (credentials never appear in Helm values)
