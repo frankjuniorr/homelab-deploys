@@ -6,6 +6,10 @@
 #
 # External access: MetalLB LoadBalancer at postgres_lb_ip:5432 (primary only)
 # Storage: Longhorn PVC per instance (postgres_storage_size each)
+#
+# Backup: barman-cloud pushes pg_basebackup + WAL to s3://homelab-cnpg/ daily at 2 AM.
+# Recovery: if the S3 bucket has content, bootstrap uses recovery instead of initdb —
+#           enabling automatic restore on destroy → deploy cycles.
 ##############################################
 
 - name: "Add CloudNativePG Helm repo"
@@ -48,13 +52,36 @@
   retries: 18
   delay: 5
 
-- name: "Deploy postgres resources (namespace | cluster | service-lb)"
+- name: "Wait for CNPG Cluster API endpoint to be ready (cache warmup after CRD reinstall)"
+  kubernetes.core.k8s_info:
+    api_version: postgresql.cnpg.io/v1
+    kind: Cluster
+  register: cnpg_api_check
+  until: cnpg_api_check is not failed
+  retries: 12
+  delay: 5
+
+- name: "Check if CNPG backup exists in stable bucket (recovery source)"
+  ansible.builtin.command:
+    cmd: >
+      aws s3 ls s3://{{ cnpg_backup_bucket }}/
+      --endpoint-url {{ garage_s3_endpoint }}
+  register: cnpg_s3_check
+  changed_when: false
+  failed_when: false
+
+- name: "Set fact: CNPG backup exists"
+  ansible.builtin.set_fact:
+    cnpg_backup_exists: "{{ cnpg_s3_check.stdout | length > 0 }}"
+
+- name: "Deploy postgres resources (namespace | backup-secret | cluster | service-lb)"
   kubernetes.core.k8s:
     state: present
     definition: "{{ lookup('template', role_path + '/templates/' + item) | from_yaml }}"
   loop:
     - storageclass.yaml.j2
     - namespace.yaml.j2
+    - cnpg-backup-secret.yaml.j2
     - cluster.yaml.j2
     - service-lb.yaml.j2
   loop_control:
@@ -72,6 +99,11 @@
     (cluster_check.resources[0].status.readyInstances | default(0) | int) == postgres_instances
   retries: 90
   delay: 10
+
+- name: "Deploy CNPG ScheduledBackup (daily → S3)"
+  kubernetes.core.k8s:
+    state: present
+    definition: "{{ lookup('template', role_path + '/templates/cnpg-scheduled-backup.yaml.j2') | from_yaml }}"
 
 - name: "Deploy PgAdmin4 resources (secret | pvc | deployment | service | httproute)"
   kubernetes.core.k8s:

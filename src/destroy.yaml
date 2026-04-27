@@ -287,14 +287,30 @@
       changed_when: false
       failed_when: false
 
-    # CNPG barman-cloud recovery requires the WAL archive destination to be empty at deploy time.
-    # If WALs from the previous cluster remain in S3, the recovery bootstrap fails with
-    # "Expected empty archive". Clearing the bucket on destroy ensures a clean slate for the next deploy.
-    # Note: this also removes base backups — CNPG always starts fresh with initdb on re-deploy.
-    - name: "Clear CNPG S3 bucket (WAL archive and base backups — prevents 'Expected empty archive' conflict on re-deploy)"
+    # Two-bucket rotation for CNPG barman-cloud recovery:
+    #   homelab-cnpg        — stable recovery source (read on next deploy)
+    #   homelab-cnpg-active — live WAL archive + base backup destination (written during cluster lifetime)
+    #
+    # On destroy we promote "active" → "stable" so the next deploy can recover from it,
+    # then wipe "active" so barman-cloud-check-wal-archive sees an empty destination and passes.
+    #
+    # Without this rotation, both source and destination point to the same path and the
+    # "Expected empty archive" safety check blocks recovery on every re-deploy.
+    - name: "Promote active CNPG backup to stable recovery source (sync active → stable bucket)"
       ansible.builtin.shell:
         cmd: >
-          aws s3 rm s3://{{ cnpg_backup_bucket }}/
+          aws s3 sync s3://{{ cnpg_active_bucket }}/
+          s3://{{ cnpg_backup_bucket }}/
+          --delete
+          --endpoint-url {{ garage_s3_endpoint }}
+          2>/dev/null || true
+      changed_when: false
+      failed_when: false
+
+    - name: "Clear active CNPG bucket (empty destination required by barman-cloud-check-wal-archive on next deploy)"
+      ansible.builtin.shell:
+        cmd: >
+          aws s3 rm s3://{{ cnpg_active_bucket }}/
           --recursive
           --endpoint-url {{ garage_s3_endpoint }}
           2>/dev/null || true

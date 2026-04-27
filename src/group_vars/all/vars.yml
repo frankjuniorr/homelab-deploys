@@ -184,7 +184,8 @@ postgres_lim_mem: "512Mi"
 # CNPG barman-cloud backup (Garage S3 — bucket: homelab-cnpg)
 # ScheduledBackup runs at 2 AM (after Velero at 1 AM, before GarageS3→Drive sync at 2:30 AM)
 # 6-field cron (seconds included): "second minute hour dom month dow"
-cnpg_backup_bucket: homelab-cnpg
+cnpg_backup_bucket: homelab-cnpg          # stable recovery source (promoted from active on destroy)
+cnpg_active_bucket: homelab-cnpg-active   # live WAL archive + base backup destination
 cnpg_backup_region: homelab
 cnpg_backup_retention: "30d"
 cnpg_schedule_cron: "0 0 2 * * *"
