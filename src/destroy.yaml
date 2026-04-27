@@ -23,6 +23,7 @@
   become: true
 
   tasks:
+    # node_exporter and its companion timer both need to stop before removing their unit files
     - name: "Stop and disable systemd units"
       ansible.builtin.systemd:
         name: "{{ item }}"
@@ -35,6 +36,7 @@
         label: "{{ item }}"
       failed_when: false
 
+    # Remove unit files so systemd doesn't try to start them on next boot
     - name: "Remove systemd unit files"
       ansible.builtin.file:
         path: "{{ item }}"
@@ -46,10 +48,12 @@
       loop_control:
         label: "{{ item }}"
 
+    # Required after removing unit files so systemd forgets the removed units
     - name: "Reload systemd after unit removal"
       ansible.builtin.systemd:
         daemon_reload: true
 
+    # Clean up binaries and the textfile directory used by the Prometheus node_exporter
     - name: "Remove binaries and textfile directory"
       ansible.builtin.file:
         path: "{{ item }}"
@@ -61,6 +65,7 @@
       loop_control:
         label: "{{ item }}"
 
+    # Remove the dedicated system user created during install
     - name: "Remove node_exporter system user"
       ansible.builtin.user:
         name: node_exporter
@@ -74,6 +79,7 @@
   become: false
 
   tasks:
+    # Build a flat list of all namespaces owned by homelab-deploys so subsequent tasks can iterate it
     - name: "Build complete namespace list"
       ansible.builtin.set_fact:
         all_namespaces: >-
@@ -85,6 +91,9 @@
                namespace_envoy, velero_namespace
              ] }}
 
+    # Webhooks must be deleted BEFORE their operator namespaces are removed.
+    # Without this, the admission webhook endpoints become unreachable after the operator pod
+    # disappears, causing every CR deletion to hang waiting for a webhook that never responds.
     - name: "Remove operator webhook configurations (Longhorn + CNPG)"
       kubernetes.core.k8s:
         state: absent
@@ -100,6 +109,9 @@
         label: "{{ item.name }}"
       failed_when: false
 
+    # Longhorn CRs carry finalizers that only the Longhorn controller can remove.
+    # Since the controller is about to be deleted with its namespace, we strip them manually
+    # so the namespace termination isn't blocked waiting for the controller to run.
     - name: "Remove finalizers from Longhorn CRs"
       ansible.builtin.shell:
         cmd: |
@@ -112,6 +124,8 @@
       changed_when: false
       failed_when: false
 
+    # CNPG Database CRs use a deletion finalizer (`cnpg.io/deleteDatabase`) that the CNPG
+    # operator must process. Stripping it manually unblocks namespace deletion after the operator is gone.
     - name: "Remove finalizers from CNPG Database CRs"
       ansible.builtin.shell:
         cmd: |
@@ -121,6 +135,8 @@
       changed_when: false
       failed_when: false
 
+    # Velero CRs (Backup, BackupStorageLocation, etc.) may also carry finalizers managed by the
+    # Velero controller. Strip them before the namespace is deleted so termination doesn't hang.
     - name: "Remove finalizers from Velero CRs"
       ansible.builtin.shell:
         cmd: |
@@ -133,6 +149,9 @@
       changed_when: false
       failed_when: false
 
+    # PVCs get a `kubernetes.io/pvc-protection` finalizer that is normally removed by the
+    # controller only after all pods using the PVC are gone. Since we're force-wiping
+    # namespaces, the controller may not get a chance to do so — strip it manually.
     - name: "Remove PVC protection finalizers from all homelab namespaces"
       ansible.builtin.shell:
         cmd: |
@@ -144,6 +163,8 @@
       changed_when: false
       failed_when: false
 
+    # Delete app namespaces first; they hold PVCs backed by Longhorn volumes.
+    # Deleting them before Longhorn ensures Longhorn can detach volumes while its controller is still running.
     - name: "Delete application namespaces"
       kubernetes.core.k8s:
         state: absent
@@ -154,6 +175,10 @@
       loop_control:
         label: "{{ item }}"
 
+    # Delete infra namespaces in one pass, but deliberately EXCLUDE longhorn-system here.
+    # Longhorn must be the last namespace deleted so volumes have time to detach before
+    # the controller dies — otherwise Longhorn leaves orphaned iSCSI sessions on the nodes,
+    # which cause "disk apparently in use" errors on the next deploy.
     - name: "Delete infrastructure namespaces (except Longhorn — must wait for PVCs first)"
       kubernetes.core.k8s:
         state: absent
@@ -174,6 +199,8 @@
       loop_control:
         label: "{{ item }}"
 
+    # Pods stuck in Succeeded or Failed don't respond to normal SIGTERM-based deletion.
+    # Force-delete them to unblock namespace termination which waits for all pods to be gone.
     - name: "Force-delete terminal pods blocking namespace termination"
       ansible.builtin.shell:
         cmd: |
@@ -188,6 +215,9 @@
       changed_when: false
       failed_when: false
 
+    # The Velero controller sometimes re-adds finalizers to its own CRs during its shutdown sequence,
+    # after we stripped them above. A second pass ensures those re-added finalizers are cleared
+    # before the namespace termination loop below checks for completion.
     - name: "Re-strip Velero finalizers post-deletion (controller may have re-added them before shutdown)"
       ansible.builtin.shell:
         cmd: |
@@ -200,6 +230,8 @@
       changed_when: false
       failed_when: false
 
+    # Block until every non-Longhorn namespace has fully terminated before proceeding to delete Longhorn.
+    # This guarantees all PVC-using pods are gone and Longhorn has detached their volumes.
     - name: "Wait for all non-Longhorn namespaces to fully terminate"
       kubernetes.core.k8s_info:
         api_version: v1
@@ -213,6 +245,8 @@
       loop_control:
         label: "{{ item }}"
 
+    # Only delete Longhorn AFTER all other namespaces are gone — volumes are now detached and
+    # Longhorn can clean up cleanly without leaving orphaned iSCSI sessions.
     - name: "Delete Longhorn namespace (after all PVC-using namespaces terminated — prevents orphaned volumes)"
       kubernetes.core.k8s:
         state: absent
@@ -220,6 +254,8 @@
         kind: Namespace
         name: "{{ longhorn_namespace }}"
 
+    # Wait for Longhorn to finish its own cleanup before removing CRDs.
+    # Deleting CRDs while the namespace is still terminating can leave stale resource versions.
     - name: "Wait for Longhorn namespace to fully terminate"
       kubernetes.core.k8s_info:
         api_version: v1
@@ -230,6 +266,9 @@
       retries: 60
       delay: 10
 
+    # Longhorn CRDs embed a webhookClientConfig pointing to the now-deleted webhook service.
+    # If left behind, the next `helm upgrade --install` fails because the CRD still references
+    # the old (gone) webhook endpoint. Delete them so the next deploy starts from scratch.
     - name: "Delete Longhorn CRDs (stale webhookClientConfig causes re-install to fail)"
       ansible.builtin.shell:
         cmd: |
@@ -238,10 +277,26 @@
       changed_when: false
       failed_when: false
 
+    # Same reason as Longhorn CRDs above: CNPG CRDs embed webhookClientConfig pointing to the
+    # deleted CNPG webhook service. Removing them ensures a clean re-install on next deploy.
     - name: "Delete CNPG CRDs (stale webhookClientConfig causes re-install to fail)"
       ansible.builtin.shell:
         cmd: |
           kubectl get crd -o name 2>/dev/null | grep '\.cnpg\.io\|\.postgresql\.cnpg\.io' \
             | xargs -r kubectl delete 2>/dev/null
+      changed_when: false
+      failed_when: false
+
+    # CNPG barman-cloud recovery requires the WAL archive destination to be empty at deploy time.
+    # If WALs from the previous cluster remain in S3, the recovery bootstrap fails with
+    # "Expected empty archive". Clearing the bucket on destroy ensures a clean slate for the next deploy.
+    # Note: this also removes base backups — CNPG always starts fresh with initdb on re-deploy.
+    - name: "Clear CNPG S3 bucket (WAL archive and base backups — prevents 'Expected empty archive' conflict on re-deploy)"
+      ansible.builtin.shell:
+        cmd: >
+          aws s3 rm s3://{{ cnpg_backup_bucket }}/
+          --recursive
+          --endpoint-url {{ garage_s3_endpoint }}
+          2>/dev/null || true
       changed_when: false
       failed_when: false
