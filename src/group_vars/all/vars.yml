@@ -94,6 +94,11 @@ velero_backup_region: homelab
 velero_schedule_cron: "0 1 * * *"   # 1 AM every day (must run before 2:30 AM GarageS3→Drive sync)
 velero_backup_ttl: "720h"            # 30 days retention
 
+# Backup checker CronJob — validates the daily backup and notifies Gotify
+velero_checker_schedule: "0 3 * * *"           # 3 AM — 2h after backup schedule
+velero_checker_image: "alpine/k8s:1.31.3"
+velero_gotify_url: "http://gotify-svc.gotify.svc.cluster.local"
+
 ##############################################################
 # Proxmox Host Monitoring
 ##############################################################
@@ -176,6 +181,13 @@ postgres_req_mem: "256Mi"
 postgres_lim_cpu: "500m"
 postgres_lim_mem: "512Mi"
 
+# CNPG barman-cloud backup (Garage S3 — bucket: homelab-cnpg)
+# ScheduledBackup runs at 2 AM (after Velero at 1 AM, before GarageS3→Drive sync at 2:30 AM)
+# 6-field cron (seconds included): "second minute hour dom month dow"
+cnpg_backup_bucket: homelab-cnpg
+cnpg_backup_retention: "30d"
+cnpg_schedule_cron: "0 0 2 * * *"
+
 ##############################################################
 # PgAdmin4 (deployed in postgres namespace as a frontend for CloudNativePG)
 ##############################################################
@@ -209,6 +221,18 @@ homepage_lim_cpu: "200m"
 homepage_lim_mem: "256Mi"
 
 ##############################################################
+# Gotify (self-hosted push notifications)
+##############################################################
+gotify_version: "2.9.1"
+gotify_domain: "gotify.{{ homelab_domain }}"
+gotify_storage_size: "512Mi"
+gotify_admin_password: "{{ vault_gotify_admin_password }}"
+gotify_req_cpu: "50m"
+gotify_req_mem: "64Mi"
+gotify_lim_cpu: "200m"
+gotify_lim_mem: "128Mi"
+
+##############################################################
 # Applications registry
 ##############################################################
 # Each entry drives the role of the same name: role name = namespace name = app name.
@@ -223,3 +247,6 @@ apps:
   - name: homepage
     namespace: homepage
     domain: "{{ homepage_domain }}"
+  - name: gotify
+    namespace: gotify
+    domain: "{{ gotify_domain }}"

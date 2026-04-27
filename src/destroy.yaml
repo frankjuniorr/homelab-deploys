@@ -117,7 +117,19 @@
         cmd: |
           kubectl get databases.postgresql.cnpg.io -n {{ namespace_postgres }} -o name 2>/dev/null \
             | xargs -r -I{} kubectl patch {} -n {{ namespace_postgres }} \
-              --type=json -p='[{"op":"remove","path":"/metadata/finalizers"}]' 2>/dev/null
+              -p '{"metadata":{"finalizers":[]}}' --type=merge 2>/dev/null
+      changed_when: false
+      failed_when: false
+
+    - name: "Remove finalizers from Velero CRs"
+      ansible.builtin.shell:
+        cmd: |
+          kubectl get crd --no-headers 2>/dev/null | awk '{print $1}' \
+            | grep '\.velero\.io$' | while read crd; do
+            kubectl get "$crd" -n {{ velero_namespace }} -o name 2>/dev/null \
+              | xargs -r -I{} kubectl patch {} -n {{ velero_namespace }} \
+                -p '{"metadata":{"finalizers":[]}}' --type=merge 2>/dev/null
+          done
       changed_when: false
       failed_when: false
 
@@ -142,7 +154,7 @@
       loop_control:
         label: "{{ item }}"
 
-    - name: "Delete infrastructure namespaces"
+    - name: "Delete infrastructure namespaces (except Longhorn — must wait for PVCs first)"
       kubernetes.core.k8s:
         state: absent
         api_version: v1
@@ -154,7 +166,6 @@
         - "{{ namespace_prometheus }}"
         - "{{ namespace_grafana }}"
         - "{{ namespace_loki }}"
-        - "{{ longhorn_namespace }}"
         - "{{ namespace_gateway }}"
         - "{{ namespace_cert_manager }}"
         - "{{ namespace_metallb }}"
@@ -177,7 +188,19 @@
       changed_when: false
       failed_when: false
 
-    - name: "Wait for all namespaces to fully terminate"
+    - name: "Re-strip Velero finalizers post-deletion (controller may have re-added them before shutdown)"
+      ansible.builtin.shell:
+        cmd: |
+          kubectl get crd --no-headers 2>/dev/null | awk '{print $1}' \
+            | grep '\.velero\.io$' | while read crd; do
+            kubectl get "$crd" -n {{ velero_namespace }} -o name 2>/dev/null \
+              | xargs -r -I{} kubectl patch {} -n {{ velero_namespace }} \
+                -p '{"metadata":{"finalizers":[]}}' --type=merge 2>/dev/null
+          done
+      changed_when: false
+      failed_when: false
+
+    - name: "Wait for all non-Longhorn namespaces to fully terminate"
       kubernetes.core.k8s_info:
         api_version: v1
         kind: Namespace
@@ -186,9 +209,26 @@
       until: ns_check.resources | length == 0
       retries: 60
       delay: 10
-      loop: "{{ all_namespaces }}"
+      loop: "{{ all_namespaces | reject('equalto', longhorn_namespace) | list }}"
       loop_control:
         label: "{{ item }}"
+
+    - name: "Delete Longhorn namespace (after all PVC-using namespaces terminated — prevents orphaned volumes)"
+      kubernetes.core.k8s:
+        state: absent
+        api_version: v1
+        kind: Namespace
+        name: "{{ longhorn_namespace }}"
+
+    - name: "Wait for Longhorn namespace to fully terminate"
+      kubernetes.core.k8s_info:
+        api_version: v1
+        kind: Namespace
+        name: "{{ longhorn_namespace }}"
+      register: ns_check
+      until: ns_check.resources | length == 0
+      retries: 60
+      delay: 10
 
     - name: "Delete Longhorn CRDs (stale webhookClientConfig causes re-install to fail)"
       ansible.builtin.shell:
