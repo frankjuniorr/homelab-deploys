@@ -50,6 +50,46 @@ while [ $SECONDS -lt $DEADLINE ]; do
         sleep 30
         echo "WAL flush complete."
       fi
+
+      # Verify the backup data file actually landed in S3.
+      # barman marks backup.info as DONE before the data upload finishes,
+      # so the Backup CR can show 'completed' even when data.* is missing.
+      echo ""
+      echo "Verifying backup data file exists in S3..."
+      BACKUP_ID=$(kubectl get "backup.postgresql.cnpg.io/$BACKUP_NAME" -n "$POSTGRES_NS" \
+        -o jsonpath='{.status.backupId}' 2>/dev/null || echo "")
+      ENDPOINT=$(kubectl get cluster postgres -n "$POSTGRES_NS" \
+        -o jsonpath='{.spec.backup.barmanObjectStore.endpointURL}' 2>/dev/null || echo "")
+      DEST_PATH=$(kubectl get cluster postgres -n "$POSTGRES_NS" \
+        -o jsonpath='{.spec.backup.barmanObjectStore.destinationPath}' 2>/dev/null || echo "")
+      ACCESS_KEY=$(kubectl get secret cnpg-backup-secret -n "$POSTGRES_NS" \
+        -o jsonpath='{.data.ACCESS_KEY_ID}' 2>/dev/null | base64 -d || echo "")
+      SECRET_KEY=$(kubectl get secret cnpg-backup-secret -n "$POSTGRES_NS" \
+        -o jsonpath='{.data.ACCESS_SECRET_KEY}' 2>/dev/null | base64 -d || echo "")
+
+      DEST_PATH="${DEST_PATH%/}"
+      if [ -n "$BACKUP_ID" ] && [ -n "$ENDPOINT" ] && [ -n "$DEST_PATH" ] && \
+         [ -n "$ACCESS_KEY" ] && [ -n "$SECRET_KEY" ]; then
+        DATA_FILE=$(AWS_ACCESS_KEY_ID="$ACCESS_KEY" AWS_SECRET_ACCESS_KEY="$SECRET_KEY" \
+          AWS_DEFAULT_REGION=homelab \
+          aws s3 ls "${DEST_PATH}/postgres/base/${BACKUP_ID}/" \
+          --endpoint-url "$ENDPOINT" 2>/dev/null | grep "data\." | head -1 || echo "")
+        if [ -z "$DATA_FILE" ]; then
+          echo ""
+          echo "ERROR: backup.info is present in S3 but data.* is missing!"
+          echo "  Backup ID : $BACKUP_ID"
+          echo "  Bucket    : $DEST_PATH"
+          echo "The backup is incomplete and CANNOT be used for recovery."
+          echo "Do NOT run 'just destroy' — re-run 'just backup' to get a valid backup."
+          exit 1
+        fi
+        echo "S3 data file verified: OK ($DATA_FILE)"
+      else
+        echo "WARNING: could not verify S3 data file (missing credentials or endpoint). Proceeding anyway."
+      fi
+
+      echo ""
+      echo "Backup is safe to use for recovery."
       exit 0
       ;;
     failed)
