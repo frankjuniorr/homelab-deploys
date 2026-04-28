@@ -171,6 +171,26 @@
       "matchStrings": ["homepage_version:\\s*\"(?<currentValue>v[\\d.]+)\""],
       "datasourceTemplate": "github-releases",
       "depNameTemplate": "gethomepage/homepage"
+    },
+    {
+      "description": "Gotify server Docker image version",
+      "customType": "regex",
+      "managerFilePatterns": [
+        "/^src/group_vars/all/vars\\.yml$/"
+      ],
+      "matchStrings": ["gotify_version:\\s*\"(?<currentValue>[\\d.]+)\""],
+      "datasourceTemplate": "docker",
+      "depNameTemplate": "gotify/server"
+    },
+    {
+      "description": "alpine/k8s image used by the Velero backup-checker CronJob",
+      "customType": "regex",
+      "managerFilePatterns": [
+        "/^src/group_vars/all/vars\\.yml$/"
+      ],
+      "matchStrings": ["velero_checker_image:\\s*\"alpine/k8s:(?<currentValue>[\\d.]+)\""],
+      "datasourceTemplate": "docker",
+      "depNameTemplate": "alpine/k8s"
     }
   ]
 }

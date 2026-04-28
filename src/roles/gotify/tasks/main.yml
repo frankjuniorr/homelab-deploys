@@ -1,0 +1,108 @@
+---
+##############################################
+# GOTIFY ROLE
+# Deploys Gotify self-hosted push notification server.
+# Data persisted via Longhorn PVC (SQLite at /app/data).
+# Admin credentials come from vault.yml (vault_gotify_admin_password).
+#
+# After deploy, automatically creates a "Velero Backup" application in Gotify
+# and stores its token as a K8s Secret (velero-gotify-token) in the velero
+# namespace, so the backup-checker CronJob can send notifications.
+# Token creation is idempotent: skipped if Secret already exists.
+# To force-recreate: just reset-gotify-token
+##############################################
+
+- name: "Load app configuration from apps registry (group_vars/all.yml)"
+  ansible.builtin.set_fact:
+    app: "{{ apps | selectattr('name', 'eq', 'gotify') | first }}"
+
+- name: "Deploy gotify resources (namespace | pvc | secret | deployment | service | httproute)"
+  kubernetes.core.k8s:
+    state: present
+    definition: "{{ lookup('template', role_path + '/templates/' + item) | from_yaml_all | list }}"
+  loop:
+    - namespace.yaml.j2
+    - pvc.yaml.j2
+    - secret.yaml.j2
+    - deployment.yaml.j2
+    - service.yaml.j2
+    - httproute.yaml.j2
+  loop_control:
+    label: "{{ item }}"
+
+- name: "Wait for Gotify deployment to become available"
+  kubernetes.core.k8s_info:
+    api_version: apps/v1
+    kind: Deployment
+    name: "{{ app.name }}"
+    namespace: "{{ app.namespace }}"
+  register: gotify_deployment
+  until: >
+    gotify_deployment.resources | length > 0 and
+    (gotify_deployment.resources[0].status.availableReplicas | default(0)) >= 1
+  retries: 24
+  delay: 5
+
+- name: "Check if Gotify app token Secret already exists in velero namespace"
+  kubernetes.core.k8s_info:
+    api_version: v1
+    kind: Secret
+    name: velero-gotify-token
+    namespace: "{{ velero_namespace }}"
+  register: existing_token_secret
+
+- name: "Set token creation flag"
+  ansible.builtin.set_fact:
+    gotify_needs_token: "{{ existing_token_secret.resources | length == 0 }}"
+
+- name: "Start temporary port-forward to Gotify service"
+  ansible.builtin.shell:
+    cmd: "kubectl port-forward svc/{{ app.name }}-svc -n {{ app.namespace }} 18080:80 >/tmp/gotify-pf.log 2>&1 & echo $!"
+  register: gotify_pf_pid
+  changed_when: false
+  when: gotify_needs_token
+
+- name: "Wait for port-forward to be ready"
+  ansible.builtin.wait_for:
+    host: localhost
+    port: 18080
+    timeout: 15
+  when: gotify_needs_token
+
+- name: "Create Velero Backup application in Gotify"
+  ansible.builtin.uri:
+    url: "http://localhost:18080/application"
+    method: POST
+    user: "admin"
+    password: "{{ gotify_admin_password }}"
+    force_basic_auth: true
+    body_format: json
+    body:
+      name: "Velero Backup"
+      description: "Notificações de backup do Velero"
+    status_code: [200, 201]
+  register: gotify_app_response
+  retries: 5
+  delay: 3
+  no_log: true
+  when: gotify_needs_token
+
+- name: "Store Gotify token as K8s Secret in velero namespace"
+  kubernetes.core.k8s:
+    state: present
+    definition:
+      apiVersion: v1
+      kind: Secret
+      metadata:
+        name: velero-gotify-token
+        namespace: "{{ velero_namespace }}"
+      type: Opaque
+      stringData:
+        token: "{{ gotify_app_response.json.token }}"
+  when: gotify_needs_token
+
+- name: "Kill temporary port-forward"
+  ansible.builtin.shell:
+    cmd: "kill {{ gotify_pf_pid.stdout | trim }} 2>/dev/null || true"
+  changed_when: false
+  when: gotify_pf_pid is defined and gotify_pf_pid.stdout is defined

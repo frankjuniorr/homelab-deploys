@@ -1,0 +1,180 @@
+---
+apiVersion: v1
+kind: ServiceAccount
+metadata:
+  name: velero-backup-checker
+  namespace: {{ velero_namespace }}
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: Role
+metadata:
+  name: velero-backup-reader
+  namespace: {{ velero_namespace }}
+rules:
+  - apiGroups: ["velero.io"]
+    resources: ["backups"]
+    verbs: ["get", "list"]
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: RoleBinding
+metadata:
+  name: velero-backup-checker
+  namespace: {{ velero_namespace }}
+subjects:
+  - kind: ServiceAccount
+    name: velero-backup-checker
+    namespace: {{ velero_namespace }}
+roleRef:
+  kind: Role
+  apiGroup: rbac.authorization.k8s.io
+  name: velero-backup-reader
+---
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: velero-backup-checker-script
+  namespace: {{ velero_namespace }}
+data:
+  check.sh: |
+    #!/bin/bash
+    set -uo pipefail
+
+    VELERO_NS="{{ velero_namespace }}"
+    SCHEDULE_NAME="homelab-daily"
+    GOTIFY_URL="{{ velero_gotify_url }}"
+    GOTIFY_TOKEN_FILE="/var/run/secrets/gotify/token"
+
+    if [ ! -f "$GOTIFY_TOKEN_FILE" ] || [ ! -s "$GOTIFY_TOKEN_FILE" ]; then
+      echo "WARNING: Gotify token not found. Notifications disabled."
+      GOTIFY_ENABLED=false
+    else
+      GOTIFY_TOKEN=$(cat "$GOTIFY_TOKEN_FILE" | tr -d '[:space:]')
+      GOTIFY_ENABLED=true
+    fi
+
+    notify() {
+      local title="$1" message="$2" priority="${3:-5}"
+      echo "[NOTIFY] [$priority] $title"
+      echo "         $message"
+      if [ "$GOTIFY_ENABLED" = "true" ]; then
+        curl -sf -X POST "${GOTIFY_URL}/message" \
+          -H "X-Gotify-Key: ${GOTIFY_TOKEN}" \
+          -H "Content-Type: application/json" \
+          -d "{\"title\":\"${title}\",\"message\":\"${message}\",\"priority\":${priority}}" \
+          || echo "WARNING: Failed to reach Gotify at ${GOTIFY_URL}"
+      fi
+    }
+
+    echo "=== Velero Backup Checker — $(date) ==="
+
+    BACKUP=$(kubectl get backup -n "$VELERO_NS" \
+      -l "velero.io/schedule-name=${SCHEDULE_NAME}" \
+      --sort-by='.metadata.creationTimestamp' \
+      -o jsonpath='{.items[-1:].metadata.name}' 2>/dev/null | tr -d '[:space:]')
+
+    if [ -z "$BACKUP" ]; then
+      notify \
+        "Velero: sem backup encontrado" \
+        "Nenhum backup do schedule '${SCHEDULE_NAME}' foi encontrado. Verifique se o Velero está rodando." \
+        8
+      exit 1
+    fi
+
+    echo "Backup mais recente: $BACKUP"
+
+    PHASE=$(kubectl get backup "$BACKUP" -n "$VELERO_NS" \
+      -o jsonpath='{.status.phase}' 2>/dev/null || echo "Unknown")
+    ERRORS=$(kubectl get backup "$BACKUP" -n "$VELERO_NS" \
+      -o jsonpath='{.status.errors}' 2>/dev/null || echo "0")
+    WARNINGS=$(kubectl get backup "$BACKUP" -n "$VELERO_NS" \
+      -o jsonpath='{.status.warnings}' 2>/dev/null || echo "0")
+    ITEMS=$(kubectl get backup "$BACKUP" -n "$VELERO_NS" \
+      -o jsonpath='{.status.itemsBackedUp}' 2>/dev/null || echo "?")
+
+    echo "Phase: $PHASE | Items: $ITEMS | Errors: ${ERRORS:-0} | Warnings: ${WARNINGS:-0}"
+
+    case "$PHASE" in
+      Completed)
+        if [ "${ERRORS:-0}" -gt 0 ] 2>/dev/null; then
+          notify \
+            "Velero: Backup com erros" \
+            "Backup ${BACKUP}: ${ITEMS} itens, ${ERRORS} erros, ${WARNINGS} avisos." \
+            7
+          exit 1
+        fi
+        notify \
+          "Velero: Backup OK" \
+          "Backup ${BACKUP} concluido com sucesso. ${ITEMS} itens, ${WARNINGS} aviso(s)." \
+          3
+        ;;
+      PartiallyFailed)
+        notify \
+          "Velero: Backup parcialmente falhou" \
+          "Backup ${BACKUP}: phase=PartiallyFailed, ${ITEMS} itens, ${ERRORS} erros, ${WARNINGS} avisos." \
+          8
+        exit 1
+        ;;
+      Failed)
+        notify \
+          "Velero: Backup FALHOU" \
+          "Backup ${BACKUP} falhou completamente. Erros: ${ERRORS}. Verifique: kubectl logs -n velero -l app.kubernetes.io/name=velero" \
+          10
+        exit 1
+        ;;
+      InProgress)
+        notify \
+          "Velero: Backup ainda em andamento" \
+          "Backup ${BACKUP} ainda esta em progresso as $(date). Verifique o schedule." \
+          5
+        ;;
+      *)
+        notify \
+          "Velero: Status inesperado" \
+          "Backup ${BACKUP} com phase desconhecida: ${PHASE}" \
+          7
+        exit 1
+        ;;
+    esac
+---
+apiVersion: batch/v1
+kind: CronJob
+metadata:
+  name: velero-backup-checker
+  namespace: {{ velero_namespace }}
+spec:
+  schedule: "{{ velero_checker_schedule }}"
+  concurrencyPolicy: Forbid
+  successfulJobsHistoryLimit: 3
+  failedJobsHistoryLimit: 3
+  jobTemplate:
+    spec:
+      template:
+        spec:
+          serviceAccountName: velero-backup-checker
+          restartPolicy: Never
+          containers:
+            - name: checker
+              image: "{{ velero_checker_image }}"
+              command: ["/bin/bash", "/scripts/check.sh"]
+              resources:
+                requests:
+                  cpu: "10m"
+                  memory: "32Mi"
+                limits:
+                  cpu: "100m"
+                  memory: "64Mi"
+              volumeMounts:
+                - name: script
+                  mountPath: /scripts
+                - name: gotify-token
+                  mountPath: /var/run/secrets/gotify
+                  readOnly: true
+          volumes:
+            - name: script
+              configMap:
+                name: velero-backup-checker-script
+                defaultMode: 0755
+            - name: gotify-token
+              secret:
+                secretName: velero-gotify-token
+                optional: true

@@ -87,9 +87,18 @@
 - name: "Check S3 bucket for existing Velero backups"
   ansible.builtin.shell:
     cmd: >
-      aws s3 ls s3://{{ velero_backup_bucket }}/
+      aws s3 ls s3://{{ velero_backup_bucket }}/backups/
       --endpoint-url {{ garage_s3_endpoint }} 2>/dev/null | grep -c '^' || echo 0
   register: s3_backup_count
+  changed_when: false
+  failed_when: false
+
+- name: "Check for restore-complete marker in S3 (set after first-deploy restore runs)"
+  ansible.builtin.shell:
+    cmd: >
+      aws s3 ls s3://{{ velero_backup_bucket }}/_restore-complete
+      --endpoint-url {{ garage_s3_endpoint }} 2>/dev/null | grep -c '^' || echo 0
+  register: s3_restore_marker
   changed_when: false
   failed_when: false
 
@@ -105,7 +114,8 @@
     velero_first_deploy: >-
       {{ (s3_backup_count.rc == 0) and
          ((s3_backup_count.stdout | trim | int) > 0) and
-         (grafana_ns_check.resources | length == 0) }}
+         (grafana_ns_check.resources | length == 0) and
+         ((s3_restore_marker.stdout | trim | int) == 0) }}
 
 - name: "Wait for Velero to sync completed backups from BSL"
   ansible.builtin.shell:
@@ -158,8 +168,42 @@
   delay: 30
   when: velero_first_deploy | bool
 
-- name: "Assert first-deploy restore completed successfully"
+- name: "Assert first-deploy restore did not fail completely"
   ansible.builtin.assert:
-    that: restore_status.resources[0].status.phase == 'Completed'
+    that: restore_status.resources[0].status.phase in ['Completed', 'PartiallyFailed']
     fail_msg: "Velero restore ended with status: {{ restore_status.resources[0].status.phase }}"
   when: velero_first_deploy | bool
+
+- name: "Warn if first-deploy restore partially failed"
+  ansible.builtin.debug:
+    msg: >
+      WARNING: restore 'first-deploy-restore' ended with PartiallyFailed.
+      Isso é esperado — recursos já existentes no cluster (CRDs do Helm,
+      namespaces do cluster-setup) geram conflitos durante o restore.
+      Verifique se os dados críticos foram restaurados:
+        kubectl get restore first-deploy-restore -n velero -o jsonpath='{.status}'
+  when: >
+    velero_first_deploy | bool and
+    restore_status.resources[0].status.phase == 'PartiallyFailed'
+
+- name: "Write restore-complete marker to S3 (prevents re-trigger on destroy → deploy cycles)"
+  ansible.builtin.shell:
+    cmd: >
+      echo "{{ ansible_facts['date_time'].iso8601 }}" |
+      aws s3 cp - s3://{{ velero_backup_bucket }}/_restore-complete
+      --endpoint-url {{ garage_s3_endpoint }}
+  changed_when: true
+  when: velero_first_deploy | bool
+
+##############################################
+# Backup Checker CronJob
+# Runs daily at {{ velero_checker_schedule }} to validate the latest backup
+# and notify Gotify. The Gotify token (velero-gotify-token Secret) is created
+# by the gotify role after first deploy; until then, notifications are skipped
+# gracefully (secret is optional: true in the CronJob volume spec).
+##############################################
+
+- name: "Deploy backup-checker (RBAC | ConfigMap | CronJob)"
+  kubernetes.core.k8s:
+    state: present
+    definition: "{{ lookup('template', role_path + '/templates/backup-checker.yaml.j2') | from_yaml_all | list }}"

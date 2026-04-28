@@ -84,15 +84,16 @@ secrets-view:
 ############################################################################
 # VELERO BACKUP / RESTORE
 ############################################################################
-# Backup manual: dispara um backup imediato sem esperar pelo schedule
-# Uso: just backup            (nome automático: manual-backup-YYYYMMDD-HHMMSS)
-#      just backup NOME       (nome customizado)
+# Backup manual: dispara Velero (objetos K8s) + CNPG (dados PostgreSQL) imediatamente
+# Uso: just backup            (nome Velero automático: manual-backup-YYYYMMDD-HHMMSS)
+#      just backup NOME       (nome Velero customizado; CNPG sempre gera nome automático)
 backup name="":
     @if [ -n "{{name}}" ]; then \
         ./scripts/velero-backup.sh "{{name}}"; \
     else \
         ./scripts/velero-backup.sh; \
     fi
+    @./scripts/cnpg-backup.sh
 
 # Restore manual: recupera dados do último backup completo no S3
 # Uso: just restore            (usa o backup mais recente)
@@ -104,6 +105,14 @@ restore backup="":
     else \
         ./scripts/velero-restore.sh; \
     fi
+
+# Recria o token Gotify usado pelo checker de backup do Velero
+# Use quando o Gotify for resetado (PVC deletado) e o token anterior ficou inválido:
+#   kubectl delete secret velero-gotify-token -n velero --ignore-not-found
+#   just deploy gotify
+reset-gotify-token:
+    @kubectl delete secret velero-gotify-token -n velero --ignore-not-found
+    @just deploy gotify
 
 ############################################################################
 # PR REVIEW

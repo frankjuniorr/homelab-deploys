@@ -102,3 +102,9 @@
         - setup
         - apps
         - homepage
+
+    - role: gotify
+      tags:
+        - setup
+        - apps
+        - gotify

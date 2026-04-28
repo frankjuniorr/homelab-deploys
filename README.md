@@ -2,11 +2,11 @@
 
 <p align="left">
   <img src="https://img.shields.io/badge/Kubernetes-326CE5.svg?style=for-the-badge&logo=kubernetes&logoColor=white" alt="Kubernetes"/>
-  <img src="https://img.shields.io/badge/K3s-FFC61C.svg?style=for-the-badge&logo=kubernetes&logoColor=white" alt="K3s"/>
+  <img src="https://img.shields.io/badge/K3s-FFC61C.svg?style=for-the-badge&logo=k3s&logoColor=white" alt="K3s"/>
   <img src="https://img.shields.io/badge/Ansible-black.svg?style=for-the-badge&logo=ansible&logoColor=white" alt="Ansible"/>
 </p>
 
-The **software/workload layer** of a personal K3s homelab. While [`homelab-iac`](../homelab-iac/) provisions the raw infrastructure (Proxmox VMs, K3s cluster), this repo configures everything that runs on top of it: networking, TLS, observability, storage, backup/DR, and applications — all driven by Ansible.
+The **software/workload layer** of a personal K3s homelab. While [`homelab-iac`](https://github.com/frankjuniorr/homelab-iac) provisions the raw infrastructure (Proxmox VMs, K3s cluster), this repo configures everything that runs on top of it: networking, TLS, observability, storage, backup/DR, and applications — all driven by Ansible.
 
 ---
 

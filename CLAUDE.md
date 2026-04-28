@@ -166,6 +166,7 @@ Each application is its own role. **Role name = namespace name = app name** (con
 4. The `HTTPRoute` must reference `{{ gateway_name }}` via `parentRefs[0]: {name: my-gateway, namespace: gateway}`
 5. Create `src/roles/<name>/tasks/main.yml`: load `app` from the `apps` list with `set_fact`, then one looped `kubernetes.core.k8s` task (namespace.yaml first, then the rest)
 6. Add the role to the "Deploy applications" play in `src/main.yaml` with tags `[setup, apps, <name>]`
+7. **Add the app to the Homepage dashboard** — add an entry in `src/roles/homepage/templates/config-services.yaml.j2` under the appropriate group (Aplicações, Monitoramento, Infraestrutura, or Rede)
 
 ## Namespace Layout
 

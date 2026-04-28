@@ -1,0 +1,52 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: {{ app.name }}
+  namespace: {{ app.namespace }}
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: {{ app.name }}
+  template:
+    metadata:
+      labels:
+        app: {{ app.name }}
+    spec:
+      containers:
+        - name: {{ app.name }}
+          image: gotify/server:{{ gotify_version }}
+          imagePullPolicy: IfNotPresent
+          ports:
+            - containerPort: 80
+          envFrom:
+            - secretRef:
+                name: {{ app.name }}-env
+          resources:
+            requests:
+              cpu: "{{ gotify_req_cpu }}"
+              memory: "{{ gotify_req_mem }}"
+            limits:
+              cpu: "{{ gotify_lim_cpu }}"
+              memory: "{{ gotify_lim_mem }}"
+          volumeMounts:
+            - name: data
+              mountPath: /app/data
+          readinessProbe:
+            httpGet:
+              path: /health
+              port: 80
+            initialDelaySeconds: 10
+            periodSeconds: 5
+            failureThreshold: 6
+          livenessProbe:
+            httpGet:
+              path: /health
+              port: 80
+            initialDelaySeconds: 20
+            periodSeconds: 10
+            failureThreshold: 3
+      volumes:
+        - name: data
+          persistentVolumeClaim:
+            claimName: {{ app.name }}-data
