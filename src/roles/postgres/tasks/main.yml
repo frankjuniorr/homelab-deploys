@@ -74,7 +74,7 @@
   ansible.builtin.set_fact:
     cnpg_backup_exists: "{{ cnpg_s3_check.stdout | length > 0 }}"
 
-- name: "Deploy postgres resources (namespace | backup-secret | cluster | service-lb)"
+- name: "Deploy postgres pre-cluster resources (storageclass | namespace | backup-secret)"
   kubernetes.core.k8s:
     state: present
     definition: "{{ lookup('template', role_path + '/templates/' + item) | from_yaml }}"
@@ -82,10 +82,27 @@
     - storageclass.yaml.j2
     - namespace.yaml.j2
     - cnpg-backup-secret.yaml.j2
-    - cluster.yaml.j2
-    - service-lb.yaml.j2
   loop_control:
     label: "{{ item }}"
+
+- name: "Check if postgres cluster already exists"
+  kubernetes.core.k8s_info:
+    api_version: postgresql.cnpg.io/v1
+    kind: Cluster
+    name: postgres
+    namespace: "{{ namespace_postgres }}"
+  register: existing_cluster
+
+- name: "Deploy postgres cluster (skipped if already exists to avoid bootstrap immutability)"
+  kubernetes.core.k8s:
+    state: present
+    definition: "{{ lookup('template', role_path + '/templates/cluster.yaml.j2') | from_yaml }}"
+  when: existing_cluster.resources | length == 0
+
+- name: "Deploy postgres LoadBalancer service"
+  kubernetes.core.k8s:
+    state: present
+    definition: "{{ lookup('template', role_path + '/templates/service-lb.yaml.j2') | from_yaml }}"
 
 - name: "Wait for PostgreSQL cluster to be ready"
   kubernetes.core.k8s_info:
