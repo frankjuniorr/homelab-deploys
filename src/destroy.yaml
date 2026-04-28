@@ -277,6 +277,14 @@
       changed_when: false
       failed_when: false
 
+    # Give the kernel time to release /dev/longhorn/* block devices after the Longhorn namespace
+    # terminates. Kubernetes considers the namespace gone once all objects are deleted, but the
+    # OS-level iSCSI detach is asynchronous — a deploy started immediately after can hit
+    # "disk apparently in use" and fail to format fresh PVCs.
+    - name: "Wait for Longhorn block devices to detach at OS level"
+      ansible.builtin.pause:
+        seconds: 60
+
     # Same reason as Longhorn CRDs above: CNPG CRDs embed webhookClientConfig pointing to the
     # deleted CNPG webhook service. Removing them ensures a clean re-install on next deploy.
     - name: "Delete CNPG CRDs (stale webhookClientConfig causes re-install to fail)"
@@ -303,9 +311,18 @@
           s3://{{ cnpg_backup_bucket }}/
           --delete
           --endpoint-url {{ garage_s3_endpoint }}
-          2>/dev/null || true
       changed_when: false
-      failed_when: false
+
+    - name: "Verify base backup data file landed in stable bucket before clearing active"
+      ansible.builtin.shell:
+        cmd: >
+          aws s3 ls s3://{{ cnpg_backup_bucket }}/postgres/base/
+          --recursive
+          --endpoint-url {{ garage_s3_endpoint }}
+          | grep 'data\.'
+      register: stable_data_check
+      changed_when: false
+      failed_when: stable_data_check.rc != 0
 
     - name: "Clear active CNPG bucket (empty destination required by barman-cloud-check-wal-archive on next deploy)"
       ansible.builtin.shell:
@@ -313,6 +330,5 @@
           aws s3 rm s3://{{ cnpg_active_bucket }}/
           --recursive
           --endpoint-url {{ garage_s3_endpoint }}
-          2>/dev/null || true
       changed_when: false
       failed_when: false
