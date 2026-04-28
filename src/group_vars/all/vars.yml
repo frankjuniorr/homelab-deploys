@@ -96,7 +96,7 @@ velero_backup_ttl: "720h"            # 30 days retention
 
 # Backup checker CronJob — validates the daily backup and notifies Gotify
 velero_checker_schedule: "0 3 * * *"           # 3 AM — 2h after backup schedule
-velero_checker_image: "alpine/k8s:1.31.3"
+velero_checker_image: "alpine/k8s:1.35.4"
 velero_gotify_url: "http://gotify-svc.gotify.svc.cluster.local"
 
 ##############################################################
