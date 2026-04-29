@@ -87,7 +87,7 @@ longhorn_backup_credential_secret: longhorn-backup-secret
 # Backs up K8s resources + PVC data (Kopia file-system backup)
 ##############################################################
 velero_namespace: velero
-velero_version: "12.0.0"
+velero_version: "12.0.1"
 velero_plugin_aws_version: "v1.14.0"
 velero_backup_bucket: homelab-velero
 velero_backup_region: homelab
