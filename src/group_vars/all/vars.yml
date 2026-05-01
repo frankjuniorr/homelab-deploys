@@ -215,7 +215,7 @@ linkding_lim_mem: "256Mi"
 ##############################################################
 # Homepage (homelab dashboard)
 ##############################################################
-homepage_version: "v0.10.9"
+homepage_version: "v1.12.3"
 homepage_domain: "home.{{ homelab_domain }}"
 homepage_req_cpu: "50m"
 homepage_req_mem: "128Mi"
