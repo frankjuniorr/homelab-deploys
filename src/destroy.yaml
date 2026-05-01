@@ -9,12 +9,11 @@
 # WARNING: This is irreversible. Run `just deploy` to restore the full stack.
 #
 # Pre-cleanup order (learned from stuck-namespace troubleshooting):
-# 1. Delete operator webhooks (Longhorn + CNPG) — they block CR deletion after operator is gone
+# 1. Delete operator webhooks (Longhorn) — they block CR deletion after operator is gone
 # 2. Strip finalizers from Longhorn CRs — controller is gone and can't process them
-# 3. Strip finalizers from CNPG Database CRs — same reason
-# 4. Strip PVC protection finalizers — pods are gone but finalizer still blocks deletion
-# 5. Delete all namespaces
-# 6. Wait until all namespaces are fully terminated (safe for subsequent `just deploy`)
+# 3. Strip PVC protection finalizers — pods are gone but finalizer still blocks deletion
+# 4. Delete all namespaces
+# 5. Wait until all namespaces are fully terminated (safe for subsequent `just deploy`)
 ##############################################
 
 - name: "Uninstall node_exporter from Proxmox host"
@@ -84,7 +83,6 @@
       ansible.builtin.set_fact:
         all_namespaces: >-
           {{ (apps | map(attribute='namespace') | list) + [
-               namespace_postgres, namespace_cnpg,
                namespace_prometheus, namespace_grafana, namespace_loki,
                longhorn_namespace, namespace_gateway,
                namespace_cert_manager, namespace_metallb,
@@ -94,7 +92,7 @@
     # Webhooks must be deleted BEFORE their operator namespaces are removed.
     # Without this, the admission webhook endpoints become unreachable after the operator pod
     # disappears, causing every CR deletion to hang waiting for a webhook that never responds.
-    - name: "Remove operator webhook configurations (Longhorn + CNPG)"
+    - name: "Remove operator webhook configurations (Longhorn)"
       kubernetes.core.k8s:
         state: absent
         api_version: admissionregistration.k8s.io/v1
@@ -103,8 +101,6 @@
       loop:
         - {kind: ValidatingWebhookConfiguration, name: longhorn-webhook-validator}
         - {kind: MutatingWebhookConfiguration,   name: longhorn-webhook-mutator}
-        - {kind: ValidatingWebhookConfiguration, name: cnpg-validating-webhook-configuration}
-        - {kind: MutatingWebhookConfiguration,   name: cnpg-mutating-webhook-configuration}
       loop_control:
         label: "{{ item.name }}"
       failed_when: false
@@ -121,17 +117,6 @@
               | xargs -r -I{} kubectl patch {} -n {{ longhorn_namespace }} \
                 -p '{"metadata":{"finalizers":[]}}' --type=merge 2>/dev/null
           done
-      changed_when: false
-      failed_when: false
-
-    # CNPG Database CRs use a deletion finalizer (`cnpg.io/deleteDatabase`) that the CNPG
-    # operator must process. Stripping it manually unblocks namespace deletion after the operator is gone.
-    - name: "Remove finalizers from CNPG Database CRs"
-      ansible.builtin.shell:
-        cmd: |
-          kubectl get databases.postgresql.cnpg.io -n {{ namespace_postgres }} -o name 2>/dev/null \
-            | xargs -r -I{} kubectl patch {} -n {{ namespace_postgres }} \
-              -p '{"metadata":{"finalizers":[]}}' --type=merge 2>/dev/null
       changed_when: false
       failed_when: false
 
@@ -186,8 +171,6 @@
         kind: Namespace
         name: "{{ item }}"
       loop:
-        - "{{ namespace_postgres }}"
-        - "{{ namespace_cnpg }}"
         - "{{ namespace_prometheus }}"
         - "{{ namespace_grafana }}"
         - "{{ namespace_loki }}"
@@ -285,50 +268,3 @@
       ansible.builtin.pause:
         seconds: 60
 
-    # Same reason as Longhorn CRDs above: CNPG CRDs embed webhookClientConfig pointing to the
-    # deleted CNPG webhook service. Removing them ensures a clean re-install on next deploy.
-    - name: "Delete CNPG CRDs (stale webhookClientConfig causes re-install to fail)"
-      ansible.builtin.shell:
-        cmd: |
-          kubectl get crd -o name 2>/dev/null | grep '\.cnpg\.io\|\.postgresql\.cnpg\.io' \
-            | xargs -r kubectl delete 2>/dev/null
-      changed_when: false
-      failed_when: false
-
-    # Two-bucket rotation for CNPG barman-cloud recovery:
-    #   homelab-cnpg        — stable recovery source (read on next deploy)
-    #   homelab-cnpg-active — live WAL archive + base backup destination (written during cluster lifetime)
-    #
-    # On destroy we promote "active" → "stable" so the next deploy can recover from it,
-    # then wipe "active" so barman-cloud-check-wal-archive sees an empty destination and passes.
-    #
-    # Without this rotation, both source and destination point to the same path and the
-    # "Expected empty archive" safety check blocks recovery on every re-deploy.
-    - name: "Promote active CNPG backup to stable recovery source (sync active → stable bucket)"
-      ansible.builtin.shell:
-        cmd: >
-          aws s3 sync s3://{{ cnpg_active_bucket }}/
-          s3://{{ cnpg_backup_bucket }}/
-          --delete
-          --endpoint-url {{ garage_s3_endpoint }}
-      changed_when: false
-
-    - name: "Verify base backup data file landed in stable bucket before clearing active"
-      ansible.builtin.shell:
-        cmd: >
-          aws s3 ls s3://{{ cnpg_backup_bucket }}/postgres/base/
-          --recursive
-          --endpoint-url {{ garage_s3_endpoint }}
-          | grep 'data\.'
-      register: stable_data_check
-      changed_when: false
-      failed_when: stable_data_check.rc != 0
-
-    - name: "Clear active CNPG bucket (empty destination required by barman-cloud-check-wal-archive on next deploy)"
-      ansible.builtin.shell:
-        cmd: >
-          aws s3 rm s3://{{ cnpg_active_bucket }}/
-          --recursive
-          --endpoint-url {{ garage_s3_endpoint }}
-      changed_when: false
-      failed_when: false

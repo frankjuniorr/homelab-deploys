@@ -1,0 +1,14 @@
+---
+- name: "Deploy PGAdmin4 resources (namespace | secret | pvc | deployment | service | httproute)"
+  kubernetes.core.k8s:
+    state: present
+    definition: "{{ lookup('template', role_path + '/templates/' + item) | from_yaml }}"
+  loop:
+    - namespace.yaml.j2
+    - pgadmin-secret.yaml.j2
+    - pgadmin-pvc.yaml.j2
+    - pgadmin-deployment.yaml.j2
+    - pgadmin-service.yaml.j2
+    - pgadmin-httproute.yaml.j2
+  loop_control:
+    label: "{{ item }}"

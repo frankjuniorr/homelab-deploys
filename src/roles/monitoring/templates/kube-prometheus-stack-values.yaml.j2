@@ -24,6 +24,23 @@ prometheus:
               - "{{ proxmox_host_ip }}:9100"
             labels:
               node: proxmox
+
+      - job_name: lxc-nodes
+        static_configs:
+          - targets:
+              - "{{ adguard_lxc_host }}:9100"
+              - "{{ garage_lxc_host }}:9100"
+              - "{{ postgres_lxc_host }}:9100"
+
+      - job_name: garage-s3
+        static_configs:
+          - targets:
+              - "{{ garage_lxc_host }}:3903"
+
+      - job_name: postgres-lxc
+        static_configs:
+          - targets:
+              - "{{ postgres_lxc_host }}:9187"
     resources:
       requests:
         cpu: "{{ prometheus_req_cpu }}"

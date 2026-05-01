@@ -84,16 +84,16 @@ secrets-view:
 ############################################################################
 # VELERO BACKUP / RESTORE
 ############################################################################
-# Backup manual: dispara Velero (objetos K8s) + CNPG (dados PostgreSQL) imediatamente
+# Backup manual: dispara Velero (objetos K8s + PVC data) imediatamente
 # Uso: just backup            (nome Velero automático: manual-backup-YYYYMMDD-HHMMSS)
-#      just backup NOME       (nome Velero customizado; CNPG sempre gera nome automático)
+#      just backup NOME       (nome Velero customizado)
+# Nota: backup do PostgreSQL LXC é gerenciado pelo homelab-iac (pg_dump → Garage S3, cron 01:45)
 backup name="":
     @if [ -n "{{name}}" ]; then \
         ./scripts/velero-backup.sh "{{name}}"; \
     else \
         ./scripts/velero-backup.sh; \
     fi
-    @./scripts/cnpg-backup.sh
 
 # Restore manual: recupera dados do último backup completo no S3
 # Uso: just restore            (usa o backup mais recente)

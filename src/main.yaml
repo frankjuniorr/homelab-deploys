@@ -66,11 +66,10 @@
         - apps
         - velero
 
-    - role: postgres
+    - role: pgadmin
       tags:
         - setup
         - apps
-        - postgres
         - pgadmin
 
     - role: podinfo
