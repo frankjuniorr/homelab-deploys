@@ -2,6 +2,8 @@ set shell := ["bash", "-c"]
 
 # Variáveis
 export VAULT_PASS_FILE := home_dir() + "/.config/homelab-iac/.vault_pass"
+garage_s3_endpoint    := "http://192.168.1.52:3900"
+velero_backup_bucket  := "homelab-velero"
 
 # Helper para rodar ansible com inventário local
 ansible_cmd := "ansible-playbook -i " + quote(invocation_directory() + "/src/hosts.yaml") + " --vault-password-file " + VAULT_PASS_FILE
@@ -105,6 +107,14 @@ restore backup="":
     else \
         ./scripts/velero-restore.sh; \
     fi
+
+# Remove o marcador _restore-complete do S3 para que o próximo `just deploy`
+# dispare o auto-restore do Velero automaticamente (útil em máquina nova ou recovery real)
+restore-reset:
+    @aws s3 rm s3://{{velero_backup_bucket}}/_restore-complete \
+        --endpoint-url {{garage_s3_endpoint}} 2>/dev/null \
+        && echo "Marker removed — next 'just deploy' will auto-restore from latest Velero backup." \
+        || echo "No marker found (already clear)."
 
 # Recria o token Gotify usado pelo checker de backup do Velero
 # Use quando o Gotify for resetado (PVC deletado) e o token anterior ficou inválido:
