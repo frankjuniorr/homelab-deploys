@@ -37,7 +37,7 @@
 
 - name: "Update Helm repo cache"
   ansible.builtin.command:
-    cmd: helm repo update
+    cmd: helm repo update vmware-tanzu
   changed_when: false
 
 - name: "Write Velero Helm values to temp file"

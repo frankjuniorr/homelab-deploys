@@ -24,7 +24,7 @@
 
 - name: "Update Helm repo cache"
   ansible.builtin.command:
-    cmd: helm repo update
+    cmd: helm repo update prometheus-community grafana
   changed_when: false
 
 - name: "Write Helm values to temp files"

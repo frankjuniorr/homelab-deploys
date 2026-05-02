@@ -15,7 +15,7 @@
 
 - name: "Update Helm repo cache"
   ansible.builtin.command:
-    cmd: helm repo update
+    cmd: helm repo update grafana
   changed_when: false
 
 - name: "Write Grafana Helm values to temp file"
