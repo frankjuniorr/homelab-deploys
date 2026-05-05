@@ -35,6 +35,10 @@ credentials:
   existingSecret: velero-credentials
 
 configuration:
+  extraEnvVars:
+    - name: TZ
+      value: "America/Recife"
+
   backupStorageLocation:
     - name: default
       provider: aws
