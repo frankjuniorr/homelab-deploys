@@ -67,7 +67,7 @@ data:
 
     echo "=== Velero Backup Checker — $(date) ==="
 
-    BACKUP=$(kubectl get backup -n "$VELERO_NS" \
+    BACKUP=$(kubectl get backup.velero.io -n "$VELERO_NS" \
       -l "velero.io/schedule-name=${SCHEDULE_NAME}" \
       --sort-by='.metadata.creationTimestamp' \
       -o jsonpath='{.items[-1:].metadata.name}' 2>/dev/null | tr -d '[:space:]')
@@ -82,13 +82,13 @@ data:
 
     echo "Backup mais recente: $BACKUP"
 
-    PHASE=$(kubectl get backup "$BACKUP" -n "$VELERO_NS" \
+    PHASE=$(kubectl get backup.velero.io "$BACKUP" -n "$VELERO_NS" \
       -o jsonpath='{.status.phase}' 2>/dev/null || echo "Unknown")
-    ERRORS=$(kubectl get backup "$BACKUP" -n "$VELERO_NS" \
+    ERRORS=$(kubectl get backup.velero.io "$BACKUP" -n "$VELERO_NS" \
       -o jsonpath='{.status.errors}' 2>/dev/null || echo "0")
-    WARNINGS=$(kubectl get backup "$BACKUP" -n "$VELERO_NS" \
+    WARNINGS=$(kubectl get backup.velero.io "$BACKUP" -n "$VELERO_NS" \
       -o jsonpath='{.status.warnings}' 2>/dev/null || echo "0")
-    ITEMS=$(kubectl get backup "$BACKUP" -n "$VELERO_NS" \
+    ITEMS=$(kubectl get backup.velero.io "$BACKUP" -n "$VELERO_NS" \
       -o jsonpath='{.status.itemsBackedUp}' 2>/dev/null || echo "?")
 
     echo "Phase: $PHASE | Items: $ITEMS | Errors: ${ERRORS:-0} | Warnings: ${WARNINGS:-0}"
@@ -148,6 +148,7 @@ spec:
   failedJobsHistoryLimit: 3
   jobTemplate:
     spec:
+      backoffLimit: 0
       template:
         spec:
           serviceAccountName: velero-backup-checker
