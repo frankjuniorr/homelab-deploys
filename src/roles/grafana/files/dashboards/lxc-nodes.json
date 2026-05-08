@@ -1,0 +1,331 @@
+{
+  "annotations": {"list": []},
+  "description": "LXC containers (mercurio/AdGuard, saturno/Garage-S3, urano/Postgres) — node_exporter metrics. Selecione o host no combobox para ver métricas individuais.",
+  "editable": true,
+  "graphTooltip": 1,
+  "links": [],
+  "panels": [
+
+    {
+      "collapsed": false,
+      "gridPos": {"h": 1, "w": 24, "x": 0, "y": 0},
+      "id": 100,
+      "title": "LXC Node — $host",
+      "type": "row"
+    },
+
+    {
+      "datasource": {"type": "prometheus", "uid": "prometheus"},
+      "fieldConfig": {
+        "defaults": {
+          "color": {"mode": "thresholds"},
+          "thresholds": {"mode": "percentage", "steps": [
+            {"color": "green", "value": null},
+            {"color": "yellow", "value": 70},
+            {"color": "red", "value": 90}
+          ]},
+          "unit": "percent", "min": 0, "max": 100
+        },
+        "overrides": []
+      },
+      "gridPos": {"h": 6, "w": 4, "x": 0, "y": 1},
+      "id": 1,
+      "options": {"orientation": "auto", "reduceOptions": {"calcs": ["lastNotNull"]}, "showThresholdMarkers": true},
+      "targets": [{
+        "datasource": {"type": "prometheus", "uid": "prometheus"},
+        "expr": "(100 - (avg by(instance) (rate(node_cpu_seconds_total{job=\"lxc-nodes\",mode=\"idle\"}[$__rate_interval])) * 100)) * on(instance) group_left(nodename) node_uname_info{job=\"lxc-nodes\",nodename=~\"$host\"}",
+        "legendFormat": "CPU", "refId": "A"
+      }],
+      "title": "CPU Usage",
+      "type": "gauge"
+    },
+
+    {
+      "datasource": {"type": "prometheus", "uid": "prometheus"},
+      "description": "Pressão REAL de RAM usando MemAvailable (exclui page cache reclaimável).",
+      "fieldConfig": {
+        "defaults": {
+          "color": {"mode": "thresholds"},
+          "thresholds": {"mode": "percentage", "steps": [
+            {"color": "green", "value": null},
+            {"color": "yellow", "value": 60},
+            {"color": "red", "value": 80}
+          ]},
+          "unit": "percent", "min": 0, "max": 100
+        },
+        "overrides": []
+      },
+      "gridPos": {"h": 6, "w": 4, "x": 4, "y": 1},
+      "id": 2,
+      "options": {"orientation": "auto", "reduceOptions": {"calcs": ["lastNotNull"]}, "showThresholdMarkers": true},
+      "targets": [{
+        "datasource": {"type": "prometheus", "uid": "prometheus"},
+        "expr": "((1 - node_memory_MemAvailable_bytes{job=\"lxc-nodes\"} / node_memory_MemTotal_bytes{job=\"lxc-nodes\"}) * 100) * on(instance) group_left(nodename) node_uname_info{job=\"lxc-nodes\",nodename=~\"$host\"}",
+        "legendFormat": "RAM Real", "refId": "A"
+      }],
+      "title": "RAM — Pressão Real (excl. cache)",
+      "type": "gauge"
+    },
+
+    {
+      "datasource": {"type": "prometheus", "uid": "prometheus"},
+      "fieldConfig": {
+        "defaults": {
+          "color": {"mode": "thresholds"},
+          "thresholds": {"mode": "percentage", "steps": [
+            {"color": "green", "value": null},
+            {"color": "yellow", "value": 70},
+            {"color": "red", "value": 90}
+          ]},
+          "unit": "percent", "min": 0, "max": 100
+        },
+        "overrides": []
+      },
+      "gridPos": {"h": 6, "w": 4, "x": 8, "y": 1},
+      "id": 3,
+      "options": {"orientation": "auto", "reduceOptions": {"calcs": ["lastNotNull"]}, "showThresholdMarkers": true},
+      "targets": [{
+        "datasource": {"type": "prometheus", "uid": "prometheus"},
+        "expr": "((node_filesystem_size_bytes{job=\"lxc-nodes\",mountpoint=\"/\",fstype!=\"tmpfs\"} - node_filesystem_free_bytes{job=\"lxc-nodes\",mountpoint=\"/\",fstype!=\"tmpfs\"}) / node_filesystem_size_bytes{job=\"lxc-nodes\",mountpoint=\"/\",fstype!=\"tmpfs\"} * 100) * on(instance) group_left(nodename) node_uname_info{job=\"lxc-nodes\",nodename=~\"$host\"}",
+        "legendFormat": "Disk /", "refId": "A"
+      }],
+      "title": "Disk Usage /",
+      "type": "gauge"
+    },
+
+    {
+      "datasource": {"type": "prometheus", "uid": "prometheus"},
+      "fieldConfig": {
+        "defaults": {"color": {"fixedColor": "green", "mode": "fixed"}, "unit": "dtdurations"}
+      },
+      "gridPos": {"h": 3, "w": 6, "x": 12, "y": 1},
+      "id": 4,
+      "options": {"colorMode": "background", "graphMode": "none", "justifyMode": "center", "reduceOptions": {"calcs": ["lastNotNull"]}, "textMode": "auto"},
+      "targets": [{
+        "datasource": {"type": "prometheus", "uid": "prometheus"},
+        "expr": "(node_time_seconds{job=\"lxc-nodes\"} - node_boot_time_seconds{job=\"lxc-nodes\"}) * on(instance) group_left(nodename) node_uname_info{job=\"lxc-nodes\",nodename=~\"$host\"}",
+        "legendFormat": "Uptime", "refId": "A"
+      }],
+      "title": "Uptime",
+      "type": "stat"
+    },
+
+    {
+      "datasource": {"type": "prometheus", "uid": "prometheus"},
+      "fieldConfig": {
+        "defaults": {"color": {"fixedColor": "blue", "mode": "fixed"}, "unit": "short", "decimals": 2}
+      },
+      "gridPos": {"h": 3, "w": 6, "x": 18, "y": 1},
+      "id": 5,
+      "options": {"colorMode": "background", "graphMode": "none", "justifyMode": "center", "reduceOptions": {"calcs": ["lastNotNull"]}, "textMode": "auto"},
+      "targets": [{
+        "datasource": {"type": "prometheus", "uid": "prometheus"},
+        "expr": "node_load1{job=\"lxc-nodes\"} * on(instance) group_left(nodename) node_uname_info{job=\"lxc-nodes\",nodename=~\"$host\"}",
+        "legendFormat": "Load 1m", "refId": "A"
+      }],
+      "title": "Load Average 1m",
+      "type": "stat"
+    },
+
+    {
+      "datasource": {"type": "prometheus", "uid": "prometheus"},
+      "fieldConfig": {
+        "defaults": {"color": {"fixedColor": "blue", "mode": "fixed"}, "unit": "bytes"}
+      },
+      "gridPos": {"h": 3, "w": 6, "x": 12, "y": 4},
+      "id": 6,
+      "options": {"colorMode": "background", "graphMode": "none", "justifyMode": "center", "reduceOptions": {"calcs": ["lastNotNull"]}, "textMode": "auto"},
+      "targets": [{
+        "datasource": {"type": "prometheus", "uid": "prometheus"},
+        "expr": "node_memory_MemAvailable_bytes{job=\"lxc-nodes\"} * on(instance) group_left(nodename) node_uname_info{job=\"lxc-nodes\",nodename=~\"$host\"}",
+        "legendFormat": "RAM Disponível", "refId": "A"
+      }],
+      "title": "RAM Disponível (real)",
+      "type": "stat"
+    },
+
+    {
+      "datasource": {"type": "prometheus", "uid": "prometheus"},
+      "fieldConfig": {
+        "defaults": {"color": {"fixedColor": "blue", "mode": "fixed"}, "unit": "short", "decimals": 2}
+      },
+      "gridPos": {"h": 3, "w": 6, "x": 18, "y": 4},
+      "id": 7,
+      "options": {"colorMode": "background", "graphMode": "none", "justifyMode": "center", "reduceOptions": {"calcs": ["lastNotNull"]}, "textMode": "auto"},
+      "targets": [{
+        "datasource": {"type": "prometheus", "uid": "prometheus"},
+        "expr": "node_load5{job=\"lxc-nodes\"} * on(instance) group_left(nodename) node_uname_info{job=\"lxc-nodes\",nodename=~\"$host\"}",
+        "legendFormat": "Load 5m", "refId": "A"
+      }],
+      "title": "Load Average 5m",
+      "type": "stat"
+    },
+
+    {
+      "datasource": {"type": "prometheus", "uid": "prometheus"},
+      "fieldConfig": {"defaults": {"unit": "percentunit"}, "overrides": []},
+      "gridPos": {"h": 8, "w": 12, "x": 0, "y": 7},
+      "id": 8,
+      "options": {
+        "legend": {"calcs": ["mean", "max"], "displayMode": "table", "placement": "bottom"},
+        "tooltip": {"mode": "multi"}
+      },
+      "targets": [
+        {
+          "datasource": {"type": "prometheus", "uid": "prometheus"},
+          "expr": "avg by(instance) (rate(node_cpu_seconds_total{job=\"lxc-nodes\",mode!=\"idle\"}[$__rate_interval])) * on(instance) group_left(nodename) node_uname_info{job=\"lxc-nodes\",nodename=~\"$host\"}",
+          "legendFormat": "CPU Total", "refId": "A"
+        },
+        {
+          "datasource": {"type": "prometheus", "uid": "prometheus"},
+          "expr": "avg by(instance) (rate(node_cpu_seconds_total{job=\"lxc-nodes\",mode=\"iowait\"}[$__rate_interval])) * on(instance) group_left(nodename) node_uname_info{job=\"lxc-nodes\",nodename=~\"$host\"}",
+          "legendFormat": "IO Wait", "refId": "B"
+        },
+        {
+          "datasource": {"type": "prometheus", "uid": "prometheus"},
+          "expr": "avg by(instance) (rate(node_cpu_seconds_total{job=\"lxc-nodes\",mode=\"system\"}[$__rate_interval])) * on(instance) group_left(nodename) node_uname_info{job=\"lxc-nodes\",nodename=~\"$host\"}",
+          "legendFormat": "System", "refId": "C"
+        }
+      ],
+      "title": "CPU Usage over time",
+      "type": "timeseries"
+    },
+
+    {
+      "datasource": {"type": "prometheus", "uid": "prometheus"},
+      "description": "Distribuição REAL da RAM. 'Apps' = uso efetivo. 'Cache+Buffers' = cache de disco reclaimável. 'Livre' = completamente livre.",
+      "fieldConfig": {
+        "defaults": {
+          "custom": {
+            "lineWidth": 0,
+            "fillOpacity": 80,
+            "stacking": {"group": "A", "mode": "normal"},
+            "showPoints": "never"
+          },
+          "unit": "bytes"
+        },
+        "overrides": [
+          {
+            "matcher": {"id": "byName", "options": "Apps"},
+            "properties": [{"id": "color", "value": {"fixedColor": "dark-orange", "mode": "fixed"}}]
+          },
+          {
+            "matcher": {"id": "byName", "options": "Cache + Buffers"},
+            "properties": [{"id": "color", "value": {"fixedColor": "dark-green", "mode": "fixed"}}]
+          },
+          {
+            "matcher": {"id": "byName", "options": "Livre"},
+            "properties": [{"id": "color", "value": {"fixedColor": "dark-blue", "mode": "fixed"}}]
+          }
+        ]
+      },
+      "gridPos": {"h": 8, "w": 12, "x": 12, "y": 7},
+      "id": 9,
+      "options": {
+        "legend": {"calcs": ["mean", "lastNotNull"], "displayMode": "table", "placement": "bottom"},
+        "tooltip": {"mode": "multi"}
+      },
+      "targets": [
+        {
+          "datasource": {"type": "prometheus", "uid": "prometheus"},
+          "expr": "(node_memory_MemTotal_bytes{job=\"lxc-nodes\"} - node_memory_MemFree_bytes{job=\"lxc-nodes\"} - node_memory_Buffers_bytes{job=\"lxc-nodes\"} - node_memory_Cached_bytes{job=\"lxc-nodes\"} - node_memory_SReclaimable_bytes{job=\"lxc-nodes\"}) * on(instance) group_left(nodename) node_uname_info{job=\"lxc-nodes\",nodename=~\"$host\"}",
+          "legendFormat": "Apps", "refId": "A"
+        },
+        {
+          "datasource": {"type": "prometheus", "uid": "prometheus"},
+          "expr": "(node_memory_Buffers_bytes{job=\"lxc-nodes\"} + node_memory_Cached_bytes{job=\"lxc-nodes\"} + node_memory_SReclaimable_bytes{job=\"lxc-nodes\"}) * on(instance) group_left(nodename) node_uname_info{job=\"lxc-nodes\",nodename=~\"$host\"}",
+          "legendFormat": "Cache + Buffers", "refId": "B"
+        },
+        {
+          "datasource": {"type": "prometheus", "uid": "prometheus"},
+          "expr": "node_memory_MemFree_bytes{job=\"lxc-nodes\"} * on(instance) group_left(nodename) node_uname_info{job=\"lxc-nodes\",nodename=~\"$host\"}",
+          "legendFormat": "Livre", "refId": "C"
+        }
+      ],
+      "title": "RAM — Distribuição Real (Apps / Cache / Livre)",
+      "type": "timeseries"
+    },
+
+    {
+      "datasource": {"type": "prometheus", "uid": "prometheus"},
+      "fieldConfig": {"defaults": {"unit": "Bps"}, "overrides": []},
+      "gridPos": {"h": 8, "w": 24, "x": 0, "y": 15},
+      "id": 10,
+      "options": {
+        "legend": {"calcs": ["mean", "max"], "displayMode": "table", "placement": "bottom"},
+        "tooltip": {"mode": "multi"}
+      },
+      "targets": [
+        {
+          "datasource": {"type": "prometheus", "uid": "prometheus"},
+          "expr": "rate(node_network_transmit_bytes_total{job=\"lxc-nodes\",device!=\"lo\"}[$__rate_interval]) * on(instance) group_left(nodename) node_uname_info{job=\"lxc-nodes\",nodename=~\"$host\"}",
+          "legendFormat": "TX {{device}}", "refId": "A"
+        },
+        {
+          "datasource": {"type": "prometheus", "uid": "prometheus"},
+          "expr": "-rate(node_network_receive_bytes_total{job=\"lxc-nodes\",device!=\"lo\"}[$__rate_interval]) * on(instance) group_left(nodename) node_uname_info{job=\"lxc-nodes\",nodename=~\"$host\"}",
+          "legendFormat": "RX {{device}}", "refId": "B"
+        }
+      ],
+      "title": "Network TX / RX",
+      "type": "timeseries"
+    },
+
+    {
+      "datasource": {"type": "prometheus", "uid": "prometheus"},
+      "fieldConfig": {"defaults": {"unit": "Bps"}, "overrides": []},
+      "gridPos": {"h": 8, "w": 24, "x": 0, "y": 23},
+      "id": 11,
+      "options": {
+        "legend": {"calcs": ["mean", "max"], "displayMode": "table", "placement": "bottom"},
+        "tooltip": {"mode": "multi"}
+      },
+      "targets": [
+        {
+          "datasource": {"type": "prometheus", "uid": "prometheus"},
+          "expr": "rate(node_disk_read_bytes_total{job=\"lxc-nodes\"}[$__rate_interval]) * on(instance) group_left(nodename) node_uname_info{job=\"lxc-nodes\",nodename=~\"$host\"}",
+          "legendFormat": "Read {{device}}", "refId": "A"
+        },
+        {
+          "datasource": {"type": "prometheus", "uid": "prometheus"},
+          "expr": "-rate(node_disk_written_bytes_total{job=\"lxc-nodes\"}[$__rate_interval]) * on(instance) group_left(nodename) node_uname_info{job=\"lxc-nodes\",nodename=~\"$host\"}",
+          "legendFormat": "Write {{device}}", "refId": "B"
+        }
+      ],
+      "title": "Disk I/O",
+      "type": "timeseries"
+    }
+
+  ],
+  "refresh": "30s",
+  "schemaVersion": 38,
+  "tags": ["lxc", "node-exporter", "homelab"],
+  "templating": {
+    "list": [
+      {
+        "current": {},
+        "datasource": {"type": "prometheus", "uid": "prometheus"},
+        "definition": "label_values(node_uname_info{job=\"lxc-nodes\"}, nodename)",
+        "hide": 0,
+        "includeAll": false,
+        "label": "Host",
+        "multi": false,
+        "name": "host",
+        "options": [],
+        "query": {
+          "query": "label_values(node_uname_info{job=\"lxc-nodes\"}, nodename)",
+          "refId": "StandardVariableQuery"
+        },
+        "refresh": 2,
+        "sort": 1,
+        "type": "query"
+      }
+    ]
+  },
+  "time": {"from": "now-1h", "to": "now"},
+  "timepicker": {},
+  "timezone": "browser",
+  "title": "LXC Nodes",
+  "uid": "homelab-lxc-nodes",
+  "version": 1
+}

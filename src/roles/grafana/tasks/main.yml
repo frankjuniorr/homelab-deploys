@@ -59,6 +59,8 @@
     - { name: cluster-logs,  folder: Loki }
     - { name: pod-logs,      folder: Loki }
     - { name: proxmox-node,  folder: Proxmox }
+    - { name: lxc-nodes,     folder: Proxmox }
+    - { name: postgres-lxc,  folder: Proxmox }
   loop_control:
     label: "{{ item.name }}"
 
