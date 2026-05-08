@@ -56,7 +56,8 @@ Justfile → Ansible playbooks (src/) → kubernetes.core modules → K3s cluste
 - **`src/main.yaml`** — Primary deployment playbook; uses tags to target subsets
 - **`src/hosts.yaml`** — Ansible inventory (`localhost` with `connection: local`)
 - **`src/roles/`** — Self-contained roles; each owns its Kubernetes manifests in `files/`
-- **`src/group_vars/all.yml`** — Global variables (namespaces, versions, domain, cert names)
+- **`src/group_vars/all/vars.yml`** — Global variables (namespaces, versions, domain, cert names)
+- **`src/group_vars/all/vault.yml`** — Encrypted secrets (always vault-encrypted in git)
 
 ### Technology Stack
 - **Ansible** — orchestration layer; roles replace the former `setup.sh`
@@ -71,54 +72,27 @@ Justfile → Ansible playbooks (src/) → kubernetes.core modules → K3s cluste
 
 ```
 src/
-├── main.yaml                        # Primary Ansible playbook (2 plays)
+├── main.yaml                        # Primary Ansible playbook
 ├── ansible.cfg                      # Ansible config (beautiful_output callback)
 ├── hosts.yaml                       # Inventory: localhost (connection: local)
 ├── requirements.yml                 # Galaxy collection: kubernetes.core
-├── group_vars/all.yml               # Global vars
+├── group_vars/all/
+│   ├── vars.yml                     # Global vars (namespaces, versions, domains)
+│   └── vault.yml                    # Encrypted secrets (vault-encrypted in git)
 ├── callback_plugins/
 │   └── beautiful_output.py          # Aesthetic output plugin
 └── roles/
-    ├── cluster-setup/               # Full cluster bootstrap (infra + networking + TLS + CA trust)
-    │   ├── tasks/
-    │   │   ├── main.yml             # Entry point: import_tasks for each section file
-    │   │   ├── gateway-api-crds.yml # Installs Gateway API Standard CRDs (kubectl apply -f URL)
-    │   │   ├── helm-charts.yml      # Deploys MetalLB, Envoy Gateway, cert-manager via kubernetes.core.helm
-    │   │   ├── wait-for-crds.yml    # Polls until each critical CRD is Established
-    │   │   ├── cert-renewal-guard.yml # Detects and removes stale wildcard TLS secret
-    │   │   ├── base-configs.yml     # Applies gateway ns, IP pool, GatewayClass, Gateway, PKI, wildcard cert
-    │   │   ├── root-ca-trust.yml    # Extracts Root CA; installs into OS + browser NSS databases
-    │   │   └── gateway-status.yml   # Polls and displays the Gateway's assigned LoadBalancer IP
-    │   ├── handlers/main.yml        # CA trust update handlers (update-ca-trust / update-ca-certificates)
-    │   └── files/                   # Kubernetes manifests applied by cluster-setup
-    │       ├── gateway-namespace.yaml    # 'gateway' namespace (for Gateway + TLS cert)
-    │       ├── metallb-config.yaml       # IPAddressPool + L2Advertisement
-    │       ├── gatewayclass.yaml         # EnvoyProxy GatewayClass (cluster-scoped)
-    │       ├── cert-manager-issuer.yaml  # self-signed Issuer + Root CA + ClusterIssuer
-    │       ├── certificate.yaml          # Wildcard cert for *.frank.lab.io (namespace: gateway)
-    │       └── gateway-api-instance.yaml # Gateway HTTP + HTTPS listeners (namespace: gateway)
-    ├── podinfo/                     # Demo application (role name = namespace name)
-    │   ├── tasks/main.yml           # Single loop: namespace.yaml + all app resources
-    │   └── files/                   # Application manifests (namespace: podinfo)
-    │       ├── namespace.yaml       # 'podinfo' namespace — first item in the deploy loop
-    │       ├── deployment.yaml      # podinfo Deployment
-    │       ├── service.yaml         # podinfo ClusterIP Service
-    │       └── httproute.yaml       # HTTPRoute: hello.frank.lab.io → my-gateway (gateway ns)
+    ├── cluster-setup/               # Infra bootstrap: MetalLB, Envoy Gateway, cert-manager, TLS, CA trust
+    ├── longhorn/                    # Distributed block storage (Helm, ns: longhorn-system)
+    ├── velero/                      # Backup/restore: Kopia → Garage S3 + auto-restore on first deploy
     ├── monitoring/                  # Prometheus + Loki + Promtail (ns: prometheus, loki)
-    │   ├── tasks/main.yml
-    │   └── templates/
-    │       ├── kube-prometheus-stack-values.yaml.j2
-    │       ├── loki-values.yaml.j2
-    │       └── prometheus-httproute.yaml.j2
-    └── grafana/                     # Grafana standalone + all dashboard ConfigMaps (ns: grafana)
-        ├── tasks/main.yml           # Helm install + dashboard ConfigMaps + HTTPRoute
-        ├── templates/
-        │   ├── grafana-values.yaml.j2
-        │   └── grafana-httproute.yaml.j2
-        └── files/dashboards/        # Dashboard JSON files (plain .json, ConfigMaps built inline)
-            ├── cluster-logs.json
-            ├── pod-logs.json
-            └── proxmox-node.json
+    ├── grafana/                     # Grafana + dashboard ConfigMaps (ns: grafana)
+    ├── proxmox-node/                # node_exporter on Proxmox host (tag: proxmox-node)
+    ├── linkding/                    # Bookmark manager → Postgres LXC backend (ns: linkding)
+    ├── pgadmin/                     # PGAdmin4 web UI (ns: pgadmin)
+    ├── homepage/                    # Homelab dashboard (ns: homepage)
+    ├── gotify/                      # Push notifications (ns: gotify)
+    └── podinfo/                     # Demo app (ns: podinfo)
 ```
 
 ### Tags for granular runs
@@ -154,7 +128,7 @@ Follows the same conventions as `homelab-iac`:
 ### Adding a New Application
 Each application is its own role. **Role name = namespace name = app name** (convention).
 
-1. **Add an entry to `apps` in `src/group_vars/all.yml`** — this is the source of truth:
+1. **Add an entry to `apps` in `src/group_vars/all/vars.yml`** — this is the source of truth:
    ```yaml
    apps:
      - name: my-app
@@ -183,6 +157,11 @@ No resources are placed in the `default` namespace. Each concern has its own nam
 | `grafana` | Grafana standalone (dashboards + datasources for Prometheus and Loki) |
 | `loki` | Loki (log aggregation) + Promtail (log collector DaemonSet) |
 | `longhorn-system` | Longhorn distributed block storage (created by Helm) |
+| `velero` | Velero backup controller + backup checker CronJob |
+| `linkding` | Linkding bookmark manager (uses Postgres LXC as DB via `LD_DB_ENGINE=postgres`) |
+| `pgadmin` | PGAdmin4 web UI — `pgadmin.frank.lab.io` |
+| `homepage` | Homelab dashboard — `home.frank.lab.io` |
+| `gotify` | Push notifications — `gotify.frank.lab.io` |
 | `<app-name>` | any future application role |
 
 ### Longhorn (Distributed Block Storage)
@@ -215,6 +194,19 @@ To add or update secrets in `vault.yml` without the interactive editor:
 3. `just secrets-encrypt` — re-encrypt before any commit
 
 Never leave `vault.yml` decrypted after editing. Always run step 3 immediately after step 2.
+
+## Backup & Recovery Troubleshooting
+
+**Invoke the `homelab-troubleshooter` sub-agent** for any backup/recovery investigation — all commands, cron checks, S3/GDrive verification, and known failure patterns are documented there.
+
+### Velero (this repo's side)
+
+- **Schedule**: `0 1 * * *` + `TZ=America/Recife` → 01:00 Recife; checker CronJob at 03:00
+- **Bucket**: `s3://homelab-velero` at `http://192.168.1.52:3900`; TTL 720h
+- **Auto-restore** on fresh deploy: fires when backups exist in S3 + `grafana` ns absent + `_restore-complete` marker absent
+- **`_restore-complete` marker**: written after restore; remove with `just restore-reset` to force re-restore
+- **Warnings "Skip pod volume…phase=Succeeded"**: always benign — Kopia maintenance jobs, not a data issue
+- **`homelab-velero` excluded from GDrive recovery by design**: K8s state is declarative in this repo; only Postgres (Linkding) data is irreplaceable
 
 ## Renovate Maintenance
 
@@ -264,6 +256,7 @@ Always invoke the appropriate skill via the `Skill` tool before doing work that 
 | Improving or auditing `CLAUDE.md` | `claude-md-improver` |
 | Diagnosing Linux/Arch Linux system issues (pacman, systemd, boot, filesystem, network, performance) | sub-agent `linux-specialist` (via `Agent` tool) |
 | Cross-layer homelab issues (Proxmox + K3s + networking + monitoring) | sub-agent `homelab-troubleshooter` (via `Agent` tool) |
+| **Backup/recovery verification** (Velero, S3, GDrive, crons, Postgres dumps, restore flow) | sub-agent `homelab-troubleshooter` (via `Agent` tool) |
 
 ## Gotchas
 
