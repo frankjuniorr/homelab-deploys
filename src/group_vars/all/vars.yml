@@ -177,7 +177,7 @@ postgres_lxc_user: app
 # PGAdmin4 (web UI pointing at the Postgres LXC)
 ##############################################################
 namespace_pgadmin: pgadmin
-pgadmin_version: "9.14"
+pgadmin_version: "9.17"
 pgadmin_domain: "pgadmin.{{ homelab_domain }}"
 pgadmin_storage_size: "512Mi"
 pgadmin_req_cpu: "50m"
