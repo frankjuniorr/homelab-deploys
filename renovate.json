@@ -3,183 +3,28 @@
   "extends": ["config:recommended"],
   "customManagers": [
     {
-      "description": "Envoy Gateway OCI Helm chart version",
+      "description": "AdGuard Home Docker image version",
       "customType": "regex",
-      "managerFilePatterns": [
-        "/^src/group_vars/all/vars\\.yml$/"
-      ],
-      "matchStrings": ["envoy_gateway_version:\\s*(?<currentValue>v[\\d.]+)"],
+      "managerFilePatterns": ["/^src/group_vars/all/stacks\\.yml$/"],
+      "matchStrings": ["adguard_image_version:\\s*\"(?<currentValue>v[\\d.]+)\""],
       "datasourceTemplate": "docker",
-      "depNameTemplate": "docker.io/envoyproxy/gateway-helm",
-      "versioningTemplate": "docker"
+      "depNameTemplate": "adguard/adguardhome"
     },
     {
-      "description": "Gateway API CRDs version (GitHub release)",
+      "description": "Tailscale Docker image version",
       "customType": "regex",
-      "managerFilePatterns": [
-        "/^src/group_vars/all/vars\\.yml$/"
-      ],
-      "matchStrings": ["gateway_api_version:\\s*(?<currentValue>v[\\d.]+)"],
-      "datasourceTemplate": "github-releases",
-      "depNameTemplate": "kubernetes-sigs/gateway-api"
-    },
-    {
-      "description": "MetalLB Helm chart version",
-      "customType": "regex",
-      "managerFilePatterns": [
-        "/^src/group_vars/all/vars\\.yml$/"
-      ],
-      "matchStrings": ["metallb_version:\\s*(?<currentValue>v[\\d.]+)"],
-      "datasourceTemplate": "helm",
-      "depNameTemplate": "metallb",
-      "registryUrlTemplate": "https://metallb.github.io/metallb"
-    },
-    {
-      "description": "cert-manager Helm chart version",
-      "customType": "regex",
-      "managerFilePatterns": [
-        "/^src/group_vars/all/vars\\.yml$/"
-      ],
-      "matchStrings": ["cert_manager_version:\\s*(?<currentValue>v[\\d.]+)"],
-      "datasourceTemplate": "helm",
-      "depNameTemplate": "cert-manager",
-      "registryUrlTemplate": "https://charts.jetstack.io"
-    },
-    {
-      "description": "kube-prometheus-stack Helm chart version",
-      "customType": "regex",
-      "managerFilePatterns": [
-        "/^src/group_vars/all/vars\\.yml$/"
-      ],
-      "matchStrings": ["kube_prometheus_stack_version:\\s*\"(?<currentValue>[\\d.]+)\""],
-      "datasourceTemplate": "helm",
-      "depNameTemplate": "kube-prometheus-stack",
-      "registryUrlTemplate": "https://prometheus-community.github.io/helm-charts"
-    },
-    {
-      "description": "Loki Helm chart version",
-      "customType": "regex",
-      "managerFilePatterns": [
-        "/^src/group_vars/all/vars\\.yml$/"
-      ],
-      "matchStrings": ["loki_version:\\s*\"(?<currentValue>[\\d.]+)\""],
-      "datasourceTemplate": "helm",
-      "depNameTemplate": "loki",
-      "registryUrlTemplate": "https://grafana.github.io/helm-charts"
-    },
-    {
-      "description": "Longhorn Helm chart version",
-      "customType": "regex",
-      "managerFilePatterns": [
-        "/^src/group_vars/all/vars\\.yml$/"
-      ],
-      "matchStrings": ["longhorn_version:\\s*\"(?<currentValue>[\\d.]+)\""],
-      "datasourceTemplate": "helm",
-      "depNameTemplate": "longhorn",
-      "registryUrlTemplate": "https://charts.longhorn.io"
-    },
-    {
-      "description": "Promtail Helm chart version",
-      "customType": "regex",
-      "managerFilePatterns": [
-        "/^src/group_vars/all/vars\\.yml$/"
-      ],
-      "matchStrings": ["promtail_version:\\s*\"(?<currentValue>[\\d.]+)\""],
-      "datasourceTemplate": "helm",
-      "depNameTemplate": "promtail",
-      "registryUrlTemplate": "https://grafana.github.io/helm-charts"
-    },
-    {
-      "description": "Grafana standalone Helm chart version",
-      "customType": "regex",
-      "managerFilePatterns": [
-        "/^src/group_vars/all/vars\\.yml$/"
-      ],
-      "matchStrings": ["grafana_version:\\s*\"(?<currentValue>[\\d.]+)\""],
-      "datasourceTemplate": "helm",
-      "depNameTemplate": "grafana",
-      "registryUrlTemplate": "https://grafana.github.io/helm-charts"
-    },
-    {
-      "description": "Prometheus node_exporter binary version (GitHub release)",
-      "customType": "regex",
-      "managerFilePatterns": [
-        "/^src/group_vars/all/vars\\.yml$/"
-      ],
-      "matchStrings": ["node_exporter_version:\\s*\"(?<currentValue>[\\d.]+)\""],
-      "datasourceTemplate": "github-releases",
-      "depNameTemplate": "prometheus/node_exporter"
-    },
-    {
-      "description": "Velero Helm chart version",
-      "customType": "regex",
-      "managerFilePatterns": [
-        "/^src/group_vars/all/vars\\.yml$/"
-      ],
-      "matchStrings": ["velero_version:\\s*\"(?<currentValue>[\\d.]+(?:\\.[\\d]+)*)\""],
-      "datasourceTemplate": "helm",
-      "depNameTemplate": "velero",
-      "registryUrlTemplate": "https://vmware-tanzu.github.io/helm-charts"
-    },
-    {
-      "description": "Velero AWS plugin image version (Docker)",
-      "customType": "regex",
-      "managerFilePatterns": [
-        "/^src/group_vars/all/vars\\.yml$/"
-      ],
-      "matchStrings": ["velero_plugin_aws_version:\\s*\"?(?<currentValue>v[\\d.]+)\"?"],
+      "managerFilePatterns": ["/^src/group_vars/all/stacks\\.yml$/"],
+      "matchStrings": ["tailscale_image_version:\\s*\"(?<currentValue>v[\\d.]+)\""],
       "datasourceTemplate": "docker",
-      "depNameTemplate": "velero/velero-plugin-for-aws"
+      "depNameTemplate": "tailscale/tailscale"
     },
     {
-      "description": "PgAdmin4 Docker image version",
+      "description": "Duplicati Docker image version",
       "customType": "regex",
-      "managerFilePatterns": [
-        "/^src/group_vars/all/vars\\.yml$/"
-      ],
-      "matchStrings": ["pgadmin_version:\\s*\"(?<currentValue>[\\d.]+)\""],
+      "managerFilePatterns": ["/^src/group_vars/all/stacks\\.yml$/"],
+      "matchStrings": ["duplicati_image_version:\\s*\"(?<currentValue>[\\d.]+)\""],
       "datasourceTemplate": "docker",
-      "depNameTemplate": "dpage/pgadmin4"
-    },
-    {
-      "description": "Linkding Docker image version",
-      "customType": "regex",
-      "managerFilePatterns": [
-        "/^src/group_vars/all/vars\\.yml$/"
-      ],
-      "matchStrings": ["linkding_version:\\s*\"(?<currentValue>[\\d.]+)\""],
-      "datasourceTemplate": "docker",
-      "depNameTemplate": "sissbruecker/linkding"
-    },
-    {
-      "description": "Homepage Docker image version (GitHub releases)",
-      "customType": "regex",
-      "managerFilePatterns": [
-        "/^src/group_vars/all/vars\\.yml$/"
-      ],
-      "matchStrings": ["homepage_version:\\s*\"(?<currentValue>v[\\d.]+)\""],
-      "datasourceTemplate": "github-releases",
-      "depNameTemplate": "gethomepage/homepage"
-    },
-    {
-      "description": "Gotify server Docker image version",
-      "customType": "regex",
-      "managerFilePatterns": [
-        "/^src/group_vars/all/vars\\.yml$/"
-      ],
-      "matchStrings": ["gotify_version:\\s*\"(?<currentValue>[\\d.]+)\""],
-      "datasourceTemplate": "docker",
-      "depNameTemplate": "gotify/server"
-    },
-    {
-      "description": "alpine/k8s image used by the Velero backup-checker CronJob",
-      "customType": "regex",
-      "managerFilePatterns": [
-        "/^src/group_vars/all/vars\\.yml$/"
-      ],
-      "matchStrings": ["velero_checker_image:\\s*\"alpine/k8s:(?<currentValue>[\\d.]+)\""],
-      "datasourceTemplate": "docker",
-      "depNameTemplate": "alpine/k8s"
+      "depNameTemplate": "lscr.io/linuxserver/duplicati"
     }
   ]
 }
