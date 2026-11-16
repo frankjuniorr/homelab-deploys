@@ -1,0 +1,12 @@
+# AdGuard Home — DNS for the whole LAN (port 53) + web UI on :{{ adguard_ui_port }}.
+# Host networking: simplest way to expose 53/tcp+udp with real client IPs in the query log.
+# Requires systemd-resolved stub listener disabled on the host (done by homelab-iac `docker-host` role).
+services:
+  adguardhome:
+    image: adguard/adguardhome:{{ adguard_image_version }}
+    container_name: adguardhome
+    network_mode: host
+    volumes:
+      - ./data/work:/opt/adguardhome/work
+      - ./data/conf:/opt/adguardhome/conf
+    restart: unless-stopped

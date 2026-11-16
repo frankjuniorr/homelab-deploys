@@ -1,0 +1,3 @@
+---
+# Root directory where every compose stack lives (created by homelab-iac `docker-host` role)
+docker_stacks_root: /opt/stacks

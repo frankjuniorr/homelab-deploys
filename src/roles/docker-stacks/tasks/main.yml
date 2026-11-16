@@ -1,0 +1,61 @@
+---
+# Generic role: deploys ONE docker-compose stack described in `docker_stacks`
+# (src/group_vars/all/vars.yml). Select the stack with `stack_name`.
+#
+# Layout on the host:
+#   /opt/stacks/<name>/compose.yaml   (rendered from templates/<name>/compose.yaml.j2)
+#   /opt/stacks/<name>/.env           (0600, rendered from the stack `env` map, secrets from the vault)
+#   /opt/stacks/<name>/data/...       (bind-mounted volumes — this is what the backup reads)
+
+- name: "Load the stack definition for {{ stack_name }}"
+  ansible.builtin.set_fact:
+    stack: "{{ docker_stacks | selectattr('name', 'equalto', stack_name) | first }}"
+
+- name: "Assert that every required secret/variable is defined and not empty"
+  ansible.builtin.assert:
+    that:
+      - lookup('ansible.builtin.vars', item, default='') | length > 0
+    fail_msg: "Required variable '{{ item }}' is missing or empty (add it with: just secrets-edit)"
+    quiet: true
+  loop: "{{ stack.required_vars | default([]) }}"
+  no_log: true
+
+- name: "Create the stack directory and its data directories"
+  ansible.builtin.file:
+    path: "{{ docker_stacks_root }}/{{ stack.name }}/{{ item }}"
+    state: directory
+    mode: "0755"
+  loop: "{{ [''] + (stack.data_dirs | default([])) }}"
+  loop_control:
+    label: "{{ stack.name }}/{{ item }}"
+
+- name: "Render compose.yaml for {{ stack.name }}"
+  ansible.builtin.template:
+    src: "{{ stack.name }}/compose.yaml.j2"
+    dest: "{{ docker_stacks_root }}/{{ stack.name }}/compose.yaml"
+    mode: "0644"
+
+- name: "Render .env for {{ stack.name }}"
+  ansible.builtin.template:
+    src: env.j2
+    dest: "{{ docker_stacks_root }}/{{ stack.name }}/.env"
+    mode: "0600"
+  when: stack.env | default({}) | length > 0
+  no_log: true
+
+- name: "Render extra config files for {{ stack.name }} (only when missing)"
+  ansible.builtin.template:
+    src: "{{ stack.name }}/{{ item.src }}"
+    dest: "{{ docker_stacks_root }}/{{ stack.name }}/{{ item.dest }}"
+    mode: "{{ item.mode | default('0644') }}"
+    force: false   # never clobber a config the running service already owns
+  loop: "{{ stack.extra_templates | default([]) }}"
+  loop_control:
+    label: "{{ item.dest }}"
+  no_log: true
+
+- name: "Start the {{ stack.name }} stack"
+  community.docker.docker_compose_v2:
+    project_src: "{{ docker_stacks_root }}/{{ stack.name }}"
+    state: present
+    pull: missing

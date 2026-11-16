@@ -34,15 +34,11 @@ os_commands=(
   "ansible"    # Ansible
   "python3"    # Python
   "pip3"       # pip3
-  "kubectl"    # Kubernetes CLI
-  "helm"       # Helm (used by kubernetes.core.helm module)
-  "openssl"    # Certificate operations (used by cert renewal guard in cluster-setup)
 )
 
 # Python libs required by Ansible collections
 python_libs=(
   "watchdog"    # Used by beautiful_output.py callback plugin
-  "kubernetes"  # Used by kubernetes.core collection
 )
 
 for cmd in "${os_commands[@]}"; do

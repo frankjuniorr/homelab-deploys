@@ -1,0 +1,48 @@
+---
+##############################################################
+# Phase 1 — docker-compose stacks on the Docker VM (netuno)
+# Secrets (vault_*) live in vault.yml — add them with: just secrets-edit
+##############################################################
+
+# Image versions (tracked by Renovate — see renovate.json)
+adguard_image_version: "v0.107.80"
+tailscale_image_version: "v1.104.7"
+duplicati_image_version: "2.4.1"
+
+docker_timezone: "America/Recife"
+
+# AdGuard Home
+adguard_ui_port: 3000
+adguard_admin_user: admin
+adguard_upstream_dns:
+  - https://dns.cloudflare.com/dns-query
+  - https://dns.google/dns-query
+homelab_gateway_ip: "192.168.1.200"   # Envoy Gateway IP (reserved for the Kubernetes phase — harmless until then)
+haos_ip: "192.168.1.54"            # IP of the Home Assistant VM (terra) — reserve it in the router DHCP; empty = skip the ha.<domain> rewrite
+
+# Tailscale (Subnet Router)
+tailscale_hostname: homelab-router
+tailscale_advertise_routes: "192.168.1.0/24"
+tailscale_tag: "tag:homelab"
+
+# Duplicati
+duplicati_ui_port: 8200
+
+# Source of truth for the stacks. `required_vars` are asserted before anything is written.
+docker_stacks:
+  - name: adguard
+    data_dirs: [data/work, data/conf]
+    required_vars: [vault_adguard_admin_password_hash]
+    extra_templates:
+      - { src: AdGuardHome.yaml.j2, dest: data/conf/AdGuardHome.yaml, mode: "0600" }
+  - name: tailscale
+    data_dirs: [state]
+    required_vars: [vault_tailscale_authkey]
+    env:
+      TS_AUTHKEY: "{{ vault_tailscale_authkey }}"
+  - name: duplicati
+    data_dirs: [data, backups]
+    required_vars: [vault_duplicati_ui_password, vault_duplicati_settings_key]
+    env:
+      DUPLICATI_UI_PASSWORD: "{{ vault_duplicati_ui_password }}"
+      SETTINGS_ENCRYPTION_KEY: "{{ vault_duplicati_settings_key }}"

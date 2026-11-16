@@ -1,0 +1,34 @@
+# Seed config — written ONLY when the file does not exist yet (force: false).
+# After the first start AdGuard owns this file; change settings in the UI.
+http:
+  address: 0.0.0.0:{{ adguard_ui_port }}
+users:
+  - name: {{ adguard_admin_user }}
+    password: {{ vault_adguard_admin_password_hash }}
+dns:
+  bind_hosts:
+    - 0.0.0.0
+  port: 53
+  upstream_dns:
+{% for upstream in adguard_upstream_dns %}
+    - {{ upstream }}
+{% endfor %}
+  bootstrap_dns:
+    - 1.1.1.1
+    - 8.8.8.8
+filtering:
+  filtering_enabled: true
+  rewrites:
+    - domain: "*.{{ homelab_domain }}"
+      answer: {{ homelab_gateway_ip }}
+{% if haos_ip | length > 0 %}
+    - domain: "ha.{{ homelab_domain }}"
+      answer: {{ haos_ip }}
+{% endif %}
+filters:
+  - enabled: true
+    url: https://adguardteam.github.io/HostlistsRegistry/assets/filter_1.txt
+    name: AdGuard DNS filter
+    id: 1
+# AdGuard migrates older schemas automatically on start
+schema_version: 29

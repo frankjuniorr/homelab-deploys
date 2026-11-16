@@ -1,109 +1,28 @@
 ---
 ##############################################
-# Cluster Setup
-# Bootstraps the full K3s cluster infrastructure:
-# Gateway API CRDs → Helm charts (MetalLB, Envoy, cert-manager)
-# → base configs (IP pool, Gateway, TLS CA, wildcard cert) → Root CA local trust
+# Phase 1 workload layer — docker-compose stacks on the Docker VM (netuno)
+# Requires the VM provisioned by homelab-iac (Docker Engine + /opt/stacks).
+# Order matters: AdGuard (DNS) first — HAOS and Tailscale split-DNS depend on it.
 ##############################################
-- name: "Bootstrap K3s cluster infrastructure"
-  hosts: localhost
-  connection: local
-  gather_facts: true   # Required by root-ca-trust.yml for OS detection (ansible_distribution)
-  become: false
-  tags:
-    - setup
-    - infra
-
-  roles:
-    - role: cluster-setup
-      tags:
-        - setup
-        - infra
-
-##############################################
-# Proxmox Host Monitoring
-# Installs node_exporter + VM/LXC metrics script on the Proxmox host via SSH.
-# Also applies the Grafana dashboard ConfigMap to the K3s cluster (delegate_to: localhost).
-##############################################
-- name: "Install node_exporter on Proxmox host"
-  hosts: proxmox_node
-  gather_facts: false
+- name: "Deploy docker-compose stacks on the Docker VM"
+  hosts: docker_hosts
   become: true
-  tags:
-    - setup
-    - proxmox-node
-
-  roles:
-    - role: proxmox-node
-      tags:
-        - setup
-        - proxmox-node
-
-##############################################
-# Applications
-# Each application is its own role. Role name = namespace name (convention).
-# Add new apps by creating a new role under src/roles/<app-name>/ and listing it here.
-##############################################
-- name: "Deploy applications"
-  hosts: localhost
-  connection: local
   gather_facts: false
-  become: false
   tags:
-    - setup
-    - apps
+    - docker-stacks
 
   roles:
-    - role: longhorn
-      tags:
-        - setup
-        - apps
-        - longhorn
+    - role: docker-stacks
+      vars:
+        stack_name: adguard
+      tags: [docker-stacks, adguard]
 
-    - role: velero
-      tags:
-        - setup
-        - apps
-        - velero
+    - role: docker-stacks
+      vars:
+        stack_name: tailscale
+      tags: [docker-stacks, tailscale]
 
-    - role: pgadmin
-      tags:
-        - setup
-        - apps
-        - pgadmin
-
-    - role: podinfo
-      tags:
-        - setup
-        - apps
-        - podinfo
-
-    - role: monitoring
-      tags:
-        - setup
-        - apps
-        - monitoring
-
-    - role: grafana
-      tags:
-        - setup
-        - apps
-        - grafana
-
-    - role: linkding
-      tags:
-        - setup
-        - apps
-        - linkding
-
-    - role: homepage
-      tags:
-        - setup
-        - apps
-        - homepage
-
-    - role: gotify
-      tags:
-        - setup
-        - apps
-        - gotify
+    - role: docker-stacks
+      vars:
+        stack_name: duplicati
+      tags: [docker-stacks, duplicati]

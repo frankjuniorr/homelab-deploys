@@ -1,0 +1,26 @@
+# Duplicati — versioned, encrypted, deduplicated backups (replaces rclone/rsync mirroring).
+# Sources are mounted READ-ONLY under /source; local destination under /backups.
+#
+# Manual steps after the first start (web UI on :8200):
+#   1. Create the off-site job (Google Drive) with AES-256 encryption; keep the passphrase in 1Password.
+#   2. Source: /source (volumes live in /opt/stacks/*/data) + HA native backups + database dumps.
+#   3. Enable periodic verification (--backup-test-samples) and DO A REAL RESTORE TEST after the first run.
+# Caveat: Duplicati does not take consistent database dumps. Run pg_dump (cron / pre-script) into a folder
+# under /opt/stacks and let Duplicati read the dump; never back up live database data directories.
+services:
+  duplicati:
+    image: lscr.io/linuxserver/duplicati:{{ duplicati_image_version }}
+    container_name: duplicati
+    environment:
+      PUID: "0"   # root: needs to read every stack's data
+      PGID: "0"
+      TZ: {{ docker_timezone }}
+      SETTINGS_ENCRYPTION_KEY: ${SETTINGS_ENCRYPTION_KEY}
+      DUPLICATI__WEBSERVICE_PASSWORD: ${DUPLICATI_UI_PASSWORD}
+    volumes:
+      - ./data:/config
+      - ./backups:/backups
+      - {{ docker_stacks_root }}:/source:ro
+    ports:
+      - "{{ duplicati_ui_port }}:8200"
+    restart: unless-stopped

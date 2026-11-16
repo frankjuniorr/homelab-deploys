@@ -1,0 +1,22 @@
+# Tailscale Subnet Router — advertises the LAN to the tailnet (works behind CGNAT, no router port-forward).
+# After the first start: approve the route in the Tailscale admin console, disable key expiry for the node,
+# and configure split-DNS for {{ homelab_domain }} pointing to the AdGuard IP. See CLAUDE.md.
+services:
+  tailscale:
+    image: tailscale/tailscale:{{ tailscale_image_version }}
+    container_name: tailscale
+    hostname: {{ tailscale_hostname }}
+    network_mode: host
+    cap_add:
+      - NET_ADMIN
+      - NET_RAW
+    devices:
+      - /dev/net/tun:/dev/net/tun
+    volumes:
+      - ./state:/var/lib/tailscale
+    environment:
+      TS_AUTHKEY: ${TS_AUTHKEY}
+      TS_ROUTES: {{ tailscale_advertise_routes }}
+      TS_STATE_DIR: /var/lib/tailscale
+      TS_EXTRA_ARGS: --advertise-tags={{ tailscale_tag }}
+    restart: unless-stopped

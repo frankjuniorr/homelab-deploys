@@ -2,8 +2,6 @@ set shell := ["bash", "-c"]
 
 # Variáveis
 export VAULT_PASS_FILE := home_dir() + "/.config/homelab-iac/.vault_pass"
-garage_s3_endpoint    := "http://192.168.1.52:3900"
-velero_backup_bucket  := "homelab-velero"
 
 # Helper para rodar ansible com inventário local
 ansible_cmd := "ansible-playbook -i " + quote(invocation_directory() + "/src/hosts.yaml") + " --vault-password-file " + VAULT_PASS_FILE
@@ -19,37 +17,19 @@ install-hooks:
     @echo "Hook installed successfully."
 
 # Configuração inicial do ambiente:
-# 1. Verifica dependências (kubectl, helm, kustomize, ansible, python libs)
-# 2. Instala coleções Ansible do Galaxy (kubernetes.core)
+# 1. Verifica dependências (ansible, python libs)
+# 2. Instala coleções Ansible do Galaxy (community.docker)
 init: install-hooks
     @./scripts/check_dependencies.sh
     @ansible-galaxy collection install -r src/requirements.yml
 
 ############################################################################
-# DEPLOY
+# DEPLOY (docker-compose stacks na VM Docker `netuno`)
 ############################################################################
-# Deploy completo por padrão; passa uma tag para rodar apenas aquele subset
-# Exemplos: just deploy | just deploy pgadmin | just deploy velero | just deploy infra
-deploy tag="setup": init
+# Deploy de todas as stacks (adguard → tailscale → duplicati)
+# Exemplos: just deploy-stacks | just deploy-stacks adguard | just deploy-stacks tailscale
+deploy-stacks tag="docker-stacks": init
     @cd src && {{ansible_cmd}} main.yaml --tags "{{tag}}"
-
-# Deploy apenas a infraestrutura do cluster (sem apps)
-deploy-infra:
-    @cd src && {{ansible_cmd}} main.yaml --tags "infra"
-
-# Deploy apenas as aplicações (requer cluster já configurado)
-deploy-apps:
-    @cd src && {{ansible_cmd}} main.yaml --tags "apps"
-
-# Instala apenas o certificado Root CA no trust store local e navegadores
-# Útil após rotação de CA ou em uma nova máquina com o cluster já rodando
-install-ca:
-    @cd src && {{ansible_cmd}} main.yaml --tags "ca-trust"
-
-# Remove todos os namespaces criados pelo homelab-deploys, zerando o cluster
-# ATENÇÃO: irreversível — requer `just deploy` para restaurar
-destroy:
-    @cd src && {{ansible_cmd}} destroy.yaml
 
 ############################################################################
 # SECRETS (Ansible-Vault)
@@ -82,47 +62,6 @@ secrets-decrypt:
 # Apenas visualiza os segredos descriptografados no terminal
 secrets-view:
     @ansible-vault view src/group_vars/all/vault.yml --vault-password-file {{VAULT_PASS_FILE}}
-
-############################################################################
-# VELERO BACKUP / RESTORE
-############################################################################
-# Backup manual: dispara Velero (objetos K8s + PVC data) imediatamente
-# Uso: just backup            (nome Velero automático: manual-backup-YYYYMMDD-HHMMSS)
-#      just backup NOME       (nome Velero customizado)
-# Nota: backup do PostgreSQL LXC é gerenciado pelo homelab-iac (pg_dump → Garage S3, cron 01:45)
-backup name="":
-    @if [ -n "{{name}}" ]; then \
-        ./scripts/velero-backup.sh "{{name}}"; \
-    else \
-        ./scripts/velero-backup.sh; \
-    fi
-
-# Restore manual: recupera dados do último backup completo no S3
-# Uso: just restore            (usa o backup mais recente)
-#      just restore NOME       (usa um backup específico pelo nome)
-# Pré-requisito: criar o bucket homelab-velero no Garage via aws-cli antes do primeiro deploy
-restore backup="":
-    @if [ -n "{{backup}}" ]; then \
-        ./scripts/velero-restore.sh "{{backup}}"; \
-    else \
-        ./scripts/velero-restore.sh; \
-    fi
-
-# Remove o marcador _restore-complete do S3 para que o próximo `just deploy`
-# dispare o auto-restore do Velero automaticamente (útil em máquina nova ou recovery real)
-restore-reset:
-    @aws s3 rm s3://{{velero_backup_bucket}}/_restore-complete \
-        --endpoint-url {{garage_s3_endpoint}} 2>/dev/null \
-        && echo "Marker removed — next 'just deploy' will auto-restore from latest Velero backup." \
-        || echo "No marker found (already clear)."
-
-# Recria o token Gotify usado pelo checker de backup do Velero
-# Use quando o Gotify for resetado (PVC deletado) e o token anterior ficou inválido:
-#   kubectl delete secret velero-gotify-token -n velero --ignore-not-found
-#   just deploy gotify
-reset-gotify-token:
-    @kubectl delete secret velero-gotify-token -n velero --ignore-not-found
-    @just deploy gotify
 
 ############################################################################
 # PR REVIEW

@@ -2,4 +2,4 @@
 # ansible-galaxy collection install -r src/requirements.yml
 
 collections:
-  - name: kubernetes.core
+  - name: community.docker
